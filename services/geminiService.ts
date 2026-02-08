@@ -2,16 +2,8 @@ import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { JobPosting } from "../types";
 
 // Initialize Gemini Client
-// In a real app, ensure API_KEY is handled securely via backend proxy or env vars.
-const getApiKey = () => {
-  try {
-    return process.env.API_KEY || '';
-  } catch (e) {
-    return '';
-  }
-};
-
-const ai = new GoogleGenAI({ apiKey: getApiKey() });
+// The API key must be obtained exclusively from the environment variable process.env.API_KEY.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const getGeminiResponse = async (
   message: string,

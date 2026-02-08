@@ -1,27 +1,45 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Access environment variables for Supabase configuration securely
-// Using optional chaining and fallback to empty object to prevent "process is not defined" error
-const getEnvVar = (key: string) => {
+// Access environment variables securely
+// Support both Vite (import.meta.env) and standard process.env
+const getEnvVar = (key: string, viteKey?: string) => {
+  // 1. Try Vite import.meta.env
   try {
-    return process.env[key];
+    const meta = import.meta as any;
+    if (typeof meta !== 'undefined' && meta.env) {
+      if (viteKey && meta.env[viteKey]) return meta.env[viteKey];
+      if (meta.env[key]) return meta.env[key];
+    }
   } catch (e) {
-    return undefined;
+    // Ignore error
   }
+  
+  // 2. Try process.env
+  try {
+    // @ts-ignore
+    if (typeof process !== 'undefined' && process.env) {
+      if (viteKey && process.env[viteKey]) return process.env[viteKey];
+      return process.env[key];
+    }
+  } catch (e) {
+    // Ignore error
+  }
+  
+  return undefined;
 };
 
-const supabaseUrl = getEnvVar('SUPABASE_URL');
-const supabaseKey = getEnvVar('SUPABASE_ANON_KEY');
+const supabaseUrl = getEnvVar('SUPABASE_URL', 'VITE_SUPABASE_URL');
+const supabaseKey = getEnvVar('SUPABASE_ANON_KEY', 'VITE_SUPABASE_ANON_KEY');
 
-export const isMockMode = !supabaseUrl || !supabaseKey || supabaseUrl === 'https://your-project.supabase.co';
+// Force Mock Mode to TRUE to run in simulation/demo mode.
+export const isMockMode = true;
 
 // Fallback for development/preview to prevent crash if keys aren't set
-// This allows the UI to render, though backend features won't work without valid keys.
 const url = supabaseUrl || 'https://placeholder.supabase.co';
 const key = supabaseKey || 'placeholder-key';
 
-if (isMockMode) {
-  console.warn("Supabase credentials missing! Running in Mock Mode with simulated data.");
+if (!supabaseUrl || !supabaseKey) {
+  console.warn("Supabase credentials missing! App may not function correctly.");
 }
 
 export const supabase = createClient(url, key);

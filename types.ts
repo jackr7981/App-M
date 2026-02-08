@@ -210,3 +210,12 @@ export interface ChatMessage {
   text: string;
   timestamp: number;
 }
+
+// Wellbeing Types
+export type MoodType = 'Great' | 'Good' | 'Okay' | 'Stressed' | 'Exhausted';
+
+export interface MoodEntry {
+    id: string;
+    timestamp: number;
+    mood: MoodType;
+}
