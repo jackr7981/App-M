@@ -3,8 +3,9 @@ import { AppView, Department, Rank, User, UserProfile, SeaServiceRecord, ShipTyp
 import { Logo } from './components/Logo';
 import { Dashboard } from './components/Dashboard';
 import { AdminDashboard } from './components/AdminDashboard'; // Import Admin Dashboard
-import { ArrowRight, Mail, Lock, Upload, Calendar, Phone, CheckCircle, User as UserIcon, Loader2, Search, Globe, RefreshCw, ShieldCheck, X, AlertTriangle, WifiOff, Ship } from 'lucide-react';
+import { ArrowRight, Mail, Lock, Upload, Calendar, Phone, CheckCircle, User as UserIcon, Loader2, Search, Globe, RefreshCw, ShieldCheck, X, AlertTriangle, WifiOff, Ship, HelpCircle, ArrowLeft, Anchor } from 'lucide-react';
 import { supabase, getStorageUrl, isMockMode, isConfigured } from './services/supabase';
+import { formatDate } from './utils/format';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.LANDING);
@@ -17,11 +18,17 @@ const App: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   
+  // Forgot Password States
+  const [forgotRecoveryType, setForgotRecoveryType] = useState<'password' | 'username'>('password');
+  const [recoveryEmail, setRecoveryEmail] = useState('');
+  const [recoveryMobile, setRecoveryMobile] = useState('+880');
+  
   // Profile States
   const [profileData, setProfileData] = useState<Partial<UserProfile>>({
     department: '',
     rank: '',
     preferredShipType: '',
+    mobileNumber: '+880'
   });
   const [profilePicFile, setProfilePicFile] = useState<File | null>(null);
   const [profilePicPreview, setProfilePicPreview] = useState<string | null>(null);
@@ -90,7 +97,10 @@ const App: React.FC = () => {
             fetchUserProfile(session.user.id, session.user.email!); 
         } else {
             setCurrentUser(null);
-            setCurrentView(AppView.LANDING);
+            // Only redirect to landing if we are not in specific flows like forgot password
+            if (currentView !== AppView.FORGOT_PASSWORD) {
+                setCurrentView(AppView.LANDING);
+            }
             setAuthChecking(false);
         }
         });
@@ -115,7 +125,14 @@ const App: React.FC = () => {
         .eq('id', userId)
         .single();
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
+        if (error.code === 'PGRST116') {
+             // No profile found, go to setup
+             const user: User = { id: userId, email: email, isVerified: true };
+             setCurrentUser(user);
+             setCurrentView(AppView.PROFILE_SETUP);
+             return;
+        }
         console.error('Error fetching profile:', error);
       }
 
@@ -148,10 +165,6 @@ const App: React.FC = () => {
         localStorage.setItem(`bd_mariner_profile_${userId}`, JSON.stringify(user));
         
         setCurrentView(AppView.DASHBOARD);
-      } else {
-        // No profile in DB yet
-        setCurrentUser(user);
-        setCurrentView(AppView.PROFILE_SETUP);
       }
     } catch (error) {
       console.error('Profile fetch error:', error);
@@ -185,7 +198,7 @@ const App: React.FC = () => {
         if (error) throw error;
 
         if (data.session) {
-            // Do nothing, listener handles it
+            // Auto-logged in
         } else if (data.user) {
             alert('Check your email for the verification link!');
             setCurrentView(AppView.VERIFY_EMAIL);
@@ -204,7 +217,6 @@ const App: React.FC = () => {
 
     setLoading(true);
 
-    // Hardcoded Admin Check (Simple logic for now)
     if (email === 'admin@bdmarinerhub.com' && password === 'admin123') {
         setTimeout(() => {
             setCurrentView(AppView.ADMIN_DASHBOARD);
@@ -226,6 +238,45 @@ const App: React.FC = () => {
     }
   };
 
+  // PASSWORD RECOVERY & USER ID RECOVERY
+  const handleRecover = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setLoading(true);
+
+      try {
+          if (forgotRecoveryType === 'password') {
+              // Send Password Reset
+              const { error } = await supabase.auth.resetPasswordForEmail(recoveryEmail, {
+                  redirectTo: window.location.origin, // Redirect back to this app
+              });
+              if (error) throw error;
+              alert(`Password reset link sent to ${recoveryEmail}. Please check your inbox.`);
+              setCurrentView(AppView.LOGIN);
+          } else {
+              // Find User ID (Email) via Mobile
+              // Note: This requires the profiles table to be readable
+              const { data, error } = await supabase
+                  .from('profiles')
+                  .select('email')
+                  .eq('mobile_number', recoveryMobile)
+                  .single();
+              
+              if (error || !data) {
+                  alert("No account found with this mobile number.");
+              } else {
+                  alert(`Your User ID (Email) is: ${data.email}`);
+                  setEmail(data.email); // Pre-fill login
+                  setCurrentView(AppView.LOGIN);
+              }
+          }
+      } catch (error: any) {
+          console.error(error);
+          alert(error.message);
+      } finally {
+          setLoading(false);
+      }
+  };
+
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isOffline) { alert("Cannot update profile while offline."); return; }
@@ -239,24 +290,33 @@ const App: React.FC = () => {
       if (profilePicFile) {
         const fileExt = profilePicFile.name.split('.').pop();
         const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-        const { error: uploadError } = await supabase.storage
-          .from('avatars')
-          .upload(fileName, profilePicFile);
+        try {
+            const { error: uploadError } = await supabase.storage
+            .from('avatars')
+            .upload(fileName, profilePicFile);
 
-        if (uploadError) throw uploadError;
-        profilePicPath = fileName;
+            if (uploadError) throw uploadError;
+            profilePicPath = fileName;
+        } catch (uploadError: any) {
+            if (uploadError.message.includes("Bucket not found")) {
+                alert("Error: Storage 'avatars' bucket missing. Please run the SQL setup script.");
+            } else {
+                throw uploadError;
+            }
+        }
       }
 
       const profilePayload = {
         id: user.id,
+        email: user.email, // Store email in profile for recovery
         first_name: profileData.firstName,
         last_name: profileData.lastName,
         department: profileData.department,
         rank: profileData.rank,
         cdc_number: profileData.cdcNumber,
         mobile_number: profileData.mobileNumber,
-        date_of_birth: profileData.dateOfBirth,
-        preferred_ship_type: profileData.preferredShipType,
+        date_of_birth: profileData.date_of_birth,
+        preferred_ship_type: profileData.preferred_ship_type,
         ...(profilePicPath && { profile_picture_url: profilePicPath })
       };
 
@@ -264,9 +324,15 @@ const App: React.FC = () => {
         .from('profiles')
         .upsert(profilePayload);
 
-      if (error) throw error;
-
-      await fetchUserProfile(user.id, user.email!);
+      if (error) {
+          if (error.message.includes('relation "public.profiles" does not exist')) {
+              alert("DATABASE ERROR: The 'profiles' table does not exist. Please run the provided SQL script in your Supabase SQL Editor.");
+          } else {
+              throw error;
+          }
+      } else {
+          await fetchUserProfile(user.id, user.email!);
+      }
 
     } catch (error: any) {
       console.error('Error updating profile:', error);
@@ -565,6 +631,80 @@ const App: React.FC = () => {
     );
   }
 
+  // FORGOT PASSWORD / RECOVER ID VIEW
+  if (currentView === AppView.FORGOT_PASSWORD) {
+    return (
+        <div className="min-h-screen flex flex-col justify-center py-12 px-6 bg-slate-50">
+            <div className="sm:mx-auto sm:w-full sm:max-w-md">
+                <button onClick={() => setCurrentView(AppView.LOGIN)} className="mb-4 flex items-center text-slate-500 hover:text-slate-700 text-sm font-bold">
+                    <ArrowLeft className="w-4 h-4 mr-1" /> Back to Login
+                </button>
+                <div className="bg-white py-8 px-6 shadow-xl rounded-2xl border border-slate-100">
+                    <div className="text-center mb-6">
+                        <HelpCircle className="w-12 h-12 text-blue-600 mx-auto mb-3 bg-blue-50 rounded-full p-2" />
+                        <h2 className="text-2xl font-bold text-slate-900">Account Recovery</h2>
+                        <p className="text-sm text-slate-500 mt-1">Reset your password or find your user ID</p>
+                    </div>
+
+                    {/* Tabs */}
+                    <div className="flex border-b border-slate-200 mb-6">
+                        <button 
+                            className={`flex-1 py-2 text-sm font-bold border-b-2 ${forgotRecoveryType === 'password' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}
+                            onClick={() => setForgotRecoveryType('password')}
+                        >
+                            Reset Password
+                        </button>
+                        <button 
+                            className={`flex-1 py-2 text-sm font-bold border-b-2 ${forgotRecoveryType === 'username' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}
+                            onClick={() => setForgotRecoveryType('username')}
+                        >
+                            Find User ID
+                        </button>
+                    </div>
+
+                    <form onSubmit={handleRecover} className="space-y-4">
+                        {forgotRecoveryType === 'password' ? (
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Enter registered email</label>
+                                <input 
+                                    type="email" 
+                                    required 
+                                    value={recoveryEmail}
+                                    onChange={(e) => setRecoveryEmail(e.target.value)}
+                                    placeholder="captain@example.com"
+                                    className="w-full pl-4 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                                />
+                                <p className="text-xs text-slate-400 mt-2">We will send a password reset link to this email.</p>
+                            </div>
+                        ) : (
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Enter registered mobile</label>
+                                <input 
+                                    type="tel" 
+                                    required 
+                                    value={recoveryMobile}
+                                    onChange={(e) => setRecoveryMobile(e.target.value)}
+                                    placeholder="+880..."
+                                    className="w-full pl-4 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                                />
+                                <p className="text-xs text-slate-400 mt-2">We will try to find the User ID (Email) associated with this number.</p>
+                            </div>
+                        )}
+
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none transition-colors disabled:opacity-70"
+                        >
+                            {loading ? <Loader2 className="animate-spin w-5 h-5"/> : (forgotRecoveryType === 'password' ? 'Send Reset Link' : 'Find User ID')}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    );
+  }
+
   if (currentView === AppView.LOGIN || currentView === AppView.REGISTER) {
     const isLogin = currentView === AppView.LOGIN;
     return (
@@ -584,8 +724,20 @@ const App: React.FC = () => {
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
           <div className="bg-white py-8 px-4 shadow-xl rounded-2xl sm:px-10 border border-slate-100">
             <form className="space-y-6" onSubmit={isLogin ? handleLogin : handleRegister}>
-              {renderInput("Email Address", email, setEmail, "email", "captain@example.com", <Mail className="w-5 h-5"/>)}
+              {renderInput("Email Address (User ID)", email, setEmail, "email", "captain@example.com", <Mail className="w-5 h-5"/>)}
               {renderInput("Password", password, setPassword, "password", "••••••••", <Lock className="w-5 h-5"/>)}
+
+              {isLogin && (
+                  <div className="flex justify-end">
+                      <button 
+                        type="button" 
+                        onClick={() => setCurrentView(AppView.FORGOT_PASSWORD)}
+                        className="text-sm font-medium text-blue-600 hover:text-blue-500"
+                      >
+                          Forgot Password / User ID?
+                      </button>
+                  </div>
+              )}
 
               <div>
                 <button
@@ -601,8 +753,8 @@ const App: React.FC = () => {
                 </button>
               </div>
             </form>
-            {/* ... rest of auth form ... */}
-             <div className="mt-6">
+            
+            <div className="mt-6">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-slate-200"></div>
@@ -634,7 +786,6 @@ const App: React.FC = () => {
     );
   }
 
-  // ... (Verify Email View) ...
   if (currentView === AppView.VERIFY_EMAIL) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6">
@@ -644,15 +795,22 @@ const App: React.FC = () => {
           </div>
           <h3 className="text-2xl font-bold text-slate-900 mb-2">Verify your email</h3>
           <p className="text-slate-500 mb-8">
-            We've sent a verification link to <span className="font-semibold text-slate-800">{email}</span>. Please click the link to continue.
+            We've sent a verification link to <span className="font-semibold text-slate-800">{email}</span>. Please click the link in your inbox.
           </p>
+          
+          <div className="p-3 bg-blue-50 text-blue-700 text-xs rounded-lg mb-4 text-left">
+             <p className="font-bold mb-1">Testing Note:</p>
+             If the link redirects to localhost and you are on a live URL, you may need to update your Supabase Auth Site URL.
+          </div>
+
           <button 
             onClick={() => window.location.reload()} 
             disabled={loading}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-colors disabled:opacity-50"
+            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-colors disabled:opacity-50 flex items-center justify-center"
           >
-             I have clicked the link (Reload)
+             <RefreshCw className="w-4 h-4 mr-2" /> I have verified (Reload)
           </button>
+          
           <button 
             onClick={handleLogout}
             className="mt-4 text-sm text-slate-400 hover:text-slate-600"
@@ -717,13 +875,23 @@ const App: React.FC = () => {
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6">
                  <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center"><ShieldCheck className="w-4 h-4 mr-2 text-blue-600"/> Official Verification</h3>
                  <div className="grid grid-cols-1 gap-4">
-                    {renderInput(
-                        "Date of Birth", 
-                        profileData.dateOfBirth || '', 
-                        (v) => setProfileData({...profileData, dateOfBirth: v}), 
-                        "date", "", 
-                        <Calendar className="w-5 h-5"/>
-                    )}
+                    {/* Date Input */}
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Date of Birth</label>
+                        <div className="relative flex gap-2">
+                            <div className="relative flex-1">
+                                <div className="absolute left-3 top-3 text-slate-400"><Calendar className="w-5 h-5"/></div>
+                                <input
+                                type="date"
+                                value={profileData.dateOfBirth || ''}
+                                onChange={(e) => setProfileData({...profileData, dateOfBirth: e.target.value})}
+                                required
+                                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                                />
+                            </div>
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-1">Input Format: As per system settings (Usually MM/DD/YYYY). Will display as DD/MM/YYYY.</p>
+                    </div>
                     
                     {renderInput(
                         "CDC Number", 
@@ -768,7 +936,7 @@ const App: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 {renderInput("Mobile Number", profileData.mobileNumber || '', (v) => setProfileData({...profileData, mobileNumber: v}), "tel", "+880 1...", <Phone className="w-5 h-5"/>)}
+                 {renderInput("Mobile Number", profileData.mobileNumber || '+880', (v) => setProfileData({...profileData, mobileNumber: v}), "tel", "+880 1...", <Phone className="w-5 h-5"/>)}
                  {renderSelect(
                   "Preferred Ship Type", 
                   profileData.preferredShipType || '', 
@@ -807,83 +975,74 @@ const App: React.FC = () => {
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                 <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" onClick={() => !dosLoading && setShowDosModal(false)}></div>
                 <div className="relative bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in-95 duration-200">
-                    {/* ... DOS Modal Content ... */}
+                    
                     <div className="bg-blue-900 p-4 text-white flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                            <img src="https://erp.gso.gov.bd/img/govt_logo.png" alt="BD Govt" className="w-8 h-8 rounded-full bg-white p-0.5" onError={(e) => (e.currentTarget.style.display = 'none')} />
-                            <h3 className="font-bold">DOS Verification</h3>
-                        </div>
-                        <button onClick={() => setShowDosModal(false)} className="p-1 hover:bg-white/20 rounded-full text-white/80"><X className="w-5 h-5"/></button>
+                        <h3 className="font-bold flex items-center gap-2">
+                           <Globe className="w-5 h-5 text-blue-300" /> DOS Verification
+                        </h3>
+                        <button onClick={() => setShowDosModal(false)} disabled={dosLoading} className="p-1 hover:bg-blue-800 rounded-full transition-colors"><X className="w-5 h-5" /></button>
                     </div>
-                     <div className="p-6">
+                    
+                    <div className="p-6">
                         {dosStep === 'captcha' && (
                             <div className="space-y-4">
-                                <p className="text-sm text-slate-600">Please enter the security code to access your CDC records from <strong>gso.gov.bd</strong>.</p>
+                                <p className="text-sm text-slate-600">
+                                    Verify your identity with the Department of Shipping database to auto-fill your profile.
+                                </p>
                                 
-                                <div className="flex justify-center my-4">
-                                    <div className="bg-slate-100 p-4 rounded-lg border-2 border-slate-300 select-none relative overflow-hidden w-full text-center">
-                                        <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/black-scales.png')]"></div>
-                                        <span className="text-3xl font-mono font-bold tracking-[0.5em] text-slate-800 relative z-10" style={{textShadow: '2px 2px 2px rgba(0,0,0,0.1)'}}>
-                                            8X2K
-                                        </span>
-                                        <span className="text-[10px] absolute bottom-1 right-2 text-slate-400">gso.gov.bd</span>
+                                <div className="bg-slate-100 p-4 rounded-xl border border-slate-200 flex flex-col items-center gap-2">
+                                    <div className="bg-white px-6 py-2 rounded-lg font-mono text-xl font-bold tracking-widest text-slate-800 border border-slate-300 select-none">
+                                        8 2 A 9
                                     </div>
+                                    <p className="text-[10px] text-slate-400">Security Code</p>
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Security Code</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Enter Code</label>
                                     <input 
                                         type="text" 
                                         value={dosCaptcha}
-                                        onChange={(e) => setDosCaptcha(e.target.value.toUpperCase())}
-                                        placeholder="Enter code"
-                                        className="w-full p-3 border border-slate-300 rounded-lg font-mono text-center text-lg uppercase focus:ring-2 focus:ring-blue-500 outline-none"
+                                        onChange={(e) => setDosCaptcha(e.target.value)}
+                                        className="w-full text-center text-lg tracking-widest p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 uppercase"
+                                        placeholder="----"
                                         maxLength={4}
                                     />
-                                    <p className="text-xs text-slate-400 mt-1 text-center">Hint: The code above is 8X2K</p>
+                                    {dosError && <p className="text-xs text-red-500 mt-2 font-medium flex items-center justify-center"><AlertTriangle className="w-3 h-3 mr-1"/> {dosError}</p>}
                                 </div>
-
-                                {dosError && (
-                                    <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg flex items-center">
-                                        <AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0" />
-                                        {dosError}
-                                    </div>
-                                )}
 
                                 <button 
                                     onClick={handleDosSubmit}
-                                    disabled={dosLoading}
-                                    className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold shadow-lg shadow-green-900/20 transition-all active:scale-95 flex items-center justify-center"
+                                    disabled={dosLoading || dosCaptcha.length !== 4}
+                                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-2"
                                 >
-                                    {dosLoading ? <Loader2 className="animate-spin w-5 h-5"/> : "Verify & Fetch"}
+                                    {dosLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Verify & Fetch Data'}
                                 </button>
                             </div>
                         )}
-                        {/* ... Fetching and Success states ... */}
+
                         {dosStep === 'fetching' && (
-                            <div className="py-8 flex flex-col items-center text-center space-y-4">
-                                <div className="relative">
-                                    <div className="w-16 h-16 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                        <Globe className="w-6 h-6 text-blue-600" />
-                                    </div>
+                            <div className="py-8 text-center space-y-4">
+                                <div className="relative w-16 h-16 mx-auto">
+                                    <div className="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
+                                    <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
+                                    <Anchor className="absolute inset-0 m-auto w-6 h-6 text-blue-600 animate-pulse" />
                                 </div>
                                 <div>
-                                    <h4 className="font-bold text-slate-800">Connecting to Server...</h4>
-                                    <p className="text-sm text-slate-500 mt-1">Extracting Sea Service records...</p>
+                                    <h4 className="font-bold text-slate-800">Connecting to DOS Server...</h4>
+                                    <p className="text-xs text-slate-500 mt-1">Fetching seafarer details for CDC: {profileData.cdcNumber}</p>
                                 </div>
                             </div>
                         )}
 
                         {dosStep === 'success' && (
-                            <div className="py-6 flex flex-col items-center text-center space-y-4 animate-in zoom-in-95">
-                                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-green-600 mb-2">
+                            <div className="py-6 text-center space-y-4">
+                                <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-in zoom-in">
                                     <CheckCircle className="w-8 h-8" />
                                 </div>
                                 <div>
-                                    <h4 className="text-xl font-bold text-slate-800">Profile Found!</h4>
-                                    <p className="text-sm text-slate-500 mt-2 px-4">
-                                        Successfully imported details for <strong>{profileData.firstName} {profileData.lastName}</strong> and updated sea service history.
+                                    <h4 className="font-bold text-slate-800 text-lg">Data Found!</h4>
+                                    <p className="text-sm text-slate-600 mt-1">
+                                        We successfully retrieved your profile and sea service records.
                                     </p>
                                 </div>
                             </div>
@@ -892,26 +1051,25 @@ const App: React.FC = () => {
                 </div>
             </div>
         )}
-
       </div>
     );
   }
 
+  // Main Application Logic
   if (currentView === AppView.DASHBOARD && currentUser) {
-    return (
-        <>
-            {isOffline && (
-                <div className="fixed top-0 left-0 right-0 z-[100] bg-orange-600 text-white text-xs font-bold text-center py-1 flex items-center justify-center shadow-md">
-                    <WifiOff className="w-3 h-3 mr-2" />
-                    Offline Mode: Cached data loaded. Some features are limited.
-                </div>
-            )}
-            <Dashboard user={currentUser} onLogout={handleLogout} onEditProfile={handleEditProfile} onUpdateSeaService={handleUpdateSeaService} onToggleJobStatus={handleToggleJobStatus} onToggleOnboardStatus={handleToggleOnboardStatus} />
-        </>
-    );
+      return (
+            <Dashboard 
+                user={currentUser} 
+                onLogout={handleLogout} 
+                onEditProfile={handleEditProfile}
+                onUpdateSeaService={handleUpdateSeaService}
+                onToggleJobStatus={handleToggleJobStatus}
+                onToggleOnboardStatus={handleToggleOnboardStatus}
+            />
+      );
   }
 
-  return <div>Error: Unknown State</div>;
+  return null;
 };
 
 export default App;
