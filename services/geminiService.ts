@@ -130,15 +130,10 @@ export const analyzeDocumentImage = async (base64Image: string): Promise<Scanned
       }
       return JSON.parse(cleanText) as ScannedDocumentData;
     }
-    throw new Error("No data returned");
+    throw new Error("No data returned from AI");
   } catch (error) {
     console.error("Document Analysis Error:", error);
-    return {
-      documentName: "",
-      expiryDate: "",
-      documentNumber: "",
-      category: "Other"
-    };
+    throw error; // Rethrow to allow UI to handle it
   }
 };
 
