@@ -1,5 +1,5 @@
 -- ==============================================================================
--- BD Mariner Hub - Database Setup Script
+-- BD Mariner Hub - Complete Database Setup Script
 -- Run this in the Supabase SQL Editor
 -- ==============================================================================
 
@@ -39,7 +39,11 @@ CREATE TABLE IF NOT EXISTS public.documents (
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
 
--- 4. Create Policies (Drop existing first to avoid errors)
+-- 4. Grant Access to Authenticated Users (CRITICAL for API Access)
+GRANT ALL ON TABLE public.profiles TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.documents TO anon, authenticated, service_role;
+
+-- 5. Create Policies (Drop existing first to avoid errors)
 
 -- Profiles Policies
 DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON public.profiles;
@@ -64,9 +68,7 @@ CREATE POLICY "Users can update own documents" ON public.documents FOR UPDATE US
 DROP POLICY IF EXISTS "Users can delete own documents" ON public.documents;
 CREATE POLICY "Users can delete own documents" ON public.documents FOR DELETE USING (auth.uid() = user_id);
 
--- 5. Create Storage Buckets
--- Note: 'insert ... on conflict' doesn't work easily for buckets due to internal logic, 
--- but this block attempts to insert only if not present.
+-- 6. Create Storage Buckets
 INSERT INTO storage.buckets (id, name, public) 
 VALUES ('avatars', 'avatars', true)
 ON CONFLICT (id) DO NOTHING;
@@ -75,7 +77,7 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('documents', 'documents', true)
 ON CONFLICT (id) DO NOTHING;
 
--- 6. Storage Policies (Drop existing first)
+-- 7. Storage Policies (Drop existing first)
 
 -- Avatars
 DROP POLICY IF EXISTS "Avatar images are publicly accessible" ON storage.objects;

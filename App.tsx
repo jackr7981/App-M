@@ -315,8 +315,8 @@ const App: React.FC = () => {
         rank: profileData.rank,
         cdc_number: profileData.cdcNumber,
         mobile_number: profileData.mobileNumber,
-        date_of_birth: profileData.date_of_birth,
-        preferred_ship_type: profileData.preferred_ship_type,
+        date_of_birth: profileData.dateOfBirth,
+        preferred_ship_type: profileData.preferredShipType,
         ...(profilePicPath && { profile_picture_url: profilePicPath })
       };
 
@@ -325,8 +325,8 @@ const App: React.FC = () => {
         .upsert(profilePayload);
 
       if (error) {
-          if (error.message.includes('relation "public.profiles" does not exist')) {
-              alert("DATABASE ERROR: The 'profiles' table does not exist. Please run the provided SQL script in your Supabase SQL Editor.");
+          if (error.message.includes('relation "public.profiles" does not exist') || error.message.includes("Could not find the table")) {
+              alert("DATABASE CONFIGURATION ERROR\n\nThe 'profiles' table exists in Postgres but Supabase API doesn't see it yet.\n\nPLEASE FIX:\n1. Go to Supabase Dashboard\n2. Navigate to Project Settings > API\n3. Click 'Reload schema cache' button");
           } else {
               throw error;
           }
