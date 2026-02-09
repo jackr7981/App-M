@@ -26,7 +26,7 @@ export const getGeminiResponse = async (
   history: { role: string; parts: { text: string }[] }[] = []
 ): Promise<string> => {
   try {
-    const model = 'gemini-1.5-flash';
+    const model = 'gemini-2.5-flash-lite';
 
     // Using chat to maintain simple context history
     const chat = getAI().chats.create({
@@ -90,7 +90,7 @@ export const analyzeDocumentImage = async (base64Image: string): Promise<Scanned
     }
 
     const response = await getAI().models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.5-flash-lite',
       contents: {
         parts: [
           {
@@ -140,7 +140,7 @@ export const analyzeDocumentImage = async (base64Image: string): Promise<Scanned
 export const parseJobPosting = async (text: string): Promise<Partial<JobPosting>> => {
   try {
     const response = await getAI().models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.5-flash-lite',
       contents: `Extract maritime job details from the following unstructured text. Return JSON. Text: "${text}"`,
       config: {
         responseMimeType: "application/json",
