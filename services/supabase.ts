@@ -28,34 +28,36 @@ const getEnvVar = (key: string, viteKey?: string) => {
   return undefined;
 };
 
-const supabaseUrl = getEnvVar('SUPABASE_URL', 'VITE_SUPABASE_URL');
-const supabaseKey = getEnvVar('SUPABASE_ANON_KEY', 'VITE_SUPABASE_ANON_KEY');
+// USE PROVIDED CREDENTIALS IF ENV VARS ARE MISSING
+const PROVIDED_URL = 'https://zlgfadgwlwreezwegpkx.supabase.co';
+const PROVIDED_KEY = 'sb_publishable_WLb8f8ArmmJm931BFjD0gQ_PjRuovGR';
 
-// ---------------------------------------------------------
-// PRODUCTION MODE: Set to false to use real Supabase DB
-// ---------------------------------------------------------
-export const isMockMode = false;
+const supabaseUrl = getEnvVar('SUPABASE_URL', 'VITE_SUPABASE_URL') || PROVIDED_URL;
+const supabaseKey = getEnvVar('SUPABASE_ANON_KEY', 'VITE_SUPABASE_ANON_KEY') || PROVIDED_KEY;
 
 // Check if properly configured
-export const isConfigured = !!(supabaseUrl && supabaseKey);
+export const isConfigured = !!(supabaseUrl && supabaseKey && supabaseUrl !== 'https://placeholder.supabase.co');
 
-// Fallback to prevent crash if keys are missing (will log warning)
-// Note: 'https://placeholder.supabase.co' will cause "Failed to fetch" if used for real requests.
-const url = supabaseUrl || 'https://placeholder.supabase.co';
-const key = supabaseKey || 'placeholder-key';
+// ---------------------------------------------------------
+// CONFIGURATION
+// ---------------------------------------------------------
+// Force Live Mode since credentials are provided
+export const isMockMode = false;
 
 if (!isConfigured) {
-  console.warn("Supabase credentials missing! Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your environment variables.");
+  console.warn("Supabase credentials missing!");
+} else {
+  console.log("Supabase Live Mode Active:", supabaseUrl);
 }
 
-export const supabase = createClient(url, key);
+export const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Helper to construct public URL for images
 export const getStorageUrl = (bucket: string, path: string) => {
   if (!path) return '';
   if (path.startsWith('http')) return path; // Already a URL
   
-  // If we are using mock mode, return placeholder or data URI
+  // If we are using mock mode (legacy check), return placeholder
   if (isMockMode) return path.startsWith('data:') ? path : `https://placehold.co/400?text=${path}`; 
   
   // Real Supabase Public URL

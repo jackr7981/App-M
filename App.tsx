@@ -14,8 +14,8 @@ const App: React.FC = () => {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
   // Auth States
-  const [email, setEmail] = useState('test@test.com');
-  const [password, setPassword] = useState('12345678');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   
   // Profile States
   const [profileData, setProfileData] = useState<Partial<UserProfile>>({
@@ -43,30 +43,6 @@ const App: React.FC = () => {
 
     // Check active session
     const checkSession = async () => {
-      if (isMockMode) {
-        // Mock Session Check using LocalStorage
-        const storedSession = localStorage.getItem('bd_mariner_demo_session');
-        const storedAdmin = localStorage.getItem('bd_mariner_admin_session');
-        
-        if (storedAdmin) {
-            setCurrentView(AppView.ADMIN_DASHBOARD);
-            setAuthChecking(false);
-            return;
-        }
-
-        if (storedSession) {
-          try {
-             const user = JSON.parse(storedSession);
-             setCurrentUser(user);
-             setCurrentView(AppView.DASHBOARD);
-          } catch(e) {
-             console.error("Failed to parse mock session");
-          }
-        }
-        setAuthChecking(false);
-        return;
-      }
-
       if (!isConfigured) {
         console.warn("Supabase not configured, skipping session check.");
         setAuthChecking(false);
@@ -106,7 +82,7 @@ const App: React.FC = () => {
 
     checkSession();
 
-    if (!isMockMode && isConfigured) {
+    if (isConfigured) {
         const {
         data: { subscription },
         } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -196,26 +172,9 @@ const App: React.FC = () => {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isOffline) { alert("You are offline. Please connect to the internet to register."); return; }
-    if (!isMockMode && !isConfigured) { alert("App is not configured. Please add Supabase Credentials."); return; }
+    if (!isConfigured) { alert("App is not configured. Please add Supabase Credentials."); return; }
     
     setLoading(true);
-
-    if (isMockMode) {
-       // Mock Register Flow
-       setTimeout(() => {
-          const mockUser: User = {
-            id: 'mock-user-id',
-            email: email,
-            isVerified: true,
-          };
-          setCurrentUser(mockUser);
-          // Directly go to profile setup in mock mode
-          setCurrentView(AppView.PROFILE_SETUP);
-          setLoading(false);
-          alert("Mock Account Created! Proceeding to Profile Setup.");
-       }, 800);
-       return;
-    }
 
     try {
         const { data, error } = await supabase.auth.signUp({
@@ -240,51 +199,18 @@ const App: React.FC = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isOffline && !isMockMode) { alert("You are offline. Please connect to the internet to login."); return; }
-    if (!isMockMode && !isConfigured) { alert("App is not configured. Please add Supabase Credentials."); return; }
+    if (isOffline) { alert("You are offline. Please connect to the internet to login."); return; }
+    if (!isConfigured) { alert("App is not configured. Please add Supabase Credentials."); return; }
 
     setLoading(true);
 
-    // Hardcoded Admin Check
+    // Hardcoded Admin Check (Simple logic for now)
     if (email === 'admin@bdmarinerhub.com' && password === 'admin123') {
         setTimeout(() => {
-            if (isMockMode) localStorage.setItem('bd_mariner_admin_session', 'true');
             setCurrentView(AppView.ADMIN_DASHBOARD);
             setLoading(false);
         }, 1000);
         return;
-    }
-
-    if (isMockMode) {
-      // Mock Login Flow
-      setTimeout(() => {
-        // Create a fake populated profile for the demo
-        const mockUser: User = {
-          id: 'mock-user-id',
-          email: email,
-          isVerified: true,
-          profile: {
-            firstName: 'Tanvir',
-            lastName: 'Ahmed',
-            department: Department.DECK,
-            rank: Rank.CHIEF_OFFICER,
-            cdcNumber: 'C/O/12345',
-            mobileNumber: '+8801700000000',
-            dateOfBirth: '1990-01-01',
-            profilePicture: null,
-            seaServiceHistory: [],
-            preferredShipType: ShipType.BULK_CARRIER,
-            isOpenForWork: false,
-            isOnboard: false
-          }
-        };
-        
-        localStorage.setItem('bd_mariner_demo_session', JSON.stringify(mockUser));
-        setCurrentUser(mockUser);
-        setCurrentView(AppView.DASHBOARD);
-        setLoading(false);
-      }, 800);
-      return;
     }
 
     try {
@@ -302,38 +228,9 @@ const App: React.FC = () => {
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isOffline && !isMockMode) { alert("Cannot update profile while offline."); return; }
+    if (isOffline) { alert("Cannot update profile while offline."); return; }
     setLoading(true);
     
-    if (isMockMode) {
-        setTimeout(() => {
-            const updatedUser: User = {
-                id: currentUser?.id || 'mock-user-id',
-                email: currentUser?.email || email,
-                isVerified: true,
-                profile: {
-                    firstName: profileData.firstName || 'User',
-                    lastName: profileData.lastName || '',
-                    department: (profileData.department as Department) || Department.DECK,
-                    rank: (profileData.rank as Rank) || Rank.DECK_CADET,
-                    cdcNumber: profileData.cdcNumber || '',
-                    mobileNumber: profileData.mobileNumber || '',
-                    dateOfBirth: profileData.dateOfBirth || '',
-                    profilePicture: profilePicPreview || currentUser?.profile?.profilePicture || null,
-                    seaServiceHistory: profileData.seaServiceHistory || [],
-                    preferredShipType: profileData.preferredShipType || '',
-                    isOpenForWork: currentUser?.profile?.isOpenForWork || false,
-                    isOnboard: currentUser?.profile?.isOnboard || false
-                }
-            };
-            localStorage.setItem('bd_mariner_demo_session', JSON.stringify(updatedUser));
-            setCurrentUser(updatedUser);
-            setCurrentView(AppView.DASHBOARD);
-            setLoading(false);
-        }, 800);
-        return;
-    }
-
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
@@ -381,7 +278,7 @@ const App: React.FC = () => {
 
   const handleUpdateSeaService = async (records: SeaServiceRecord[]) => {
       if (!currentUser || !currentUser.profile) return;
-      if (isOffline && !isMockMode) { alert("You are offline. Changes will not be saved."); return; }
+      if (isOffline) { alert("You are offline. Changes will not be saved."); return; }
 
       const updatedUser = { 
           ...currentUser, 
@@ -394,30 +291,26 @@ const App: React.FC = () => {
       // Optimistic update
       setCurrentUser(updatedUser);
       
-      if (isMockMode) {
-          localStorage.setItem('bd_mariner_demo_session', JSON.stringify(updatedUser));
-      } else {
-          try {
-              const { data: { user } } = await supabase.auth.getUser();
-              if (user) {
-                  // Update Cache
-                  localStorage.setItem(`bd_mariner_profile_${user.id}`, JSON.stringify(updatedUser));
-                  
-                  // Update DB
-                  await supabase.from('profiles').update({
-                      sea_service_history: records
-                  }).eq('id', user.id);
-              }
-          } catch (e) {
-              console.error("Failed to save sea service", e);
-              alert("Failed to save sea service. Check connection.");
+      try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+              // Update Cache
+              localStorage.setItem(`bd_mariner_profile_${user.id}`, JSON.stringify(updatedUser));
+              
+              // Update DB
+              await supabase.from('profiles').update({
+                  sea_service_history: records
+              }).eq('id', user.id);
           }
+      } catch (e) {
+          console.error("Failed to save sea service", e);
+          alert("Failed to save sea service. Check connection.");
       }
   };
 
   const handleToggleJobStatus = async (newStatus: boolean) => {
     if (!currentUser || !currentUser.profile) return;
-    if (isOffline && !isMockMode) { alert("You are offline. Cannot update status."); return; }
+    if (isOffline) { alert("You are offline. Cannot update status."); return; }
 
     const updatedUser = {
         ...currentUser,
@@ -425,29 +318,25 @@ const App: React.FC = () => {
     };
     setCurrentUser(updatedUser);
 
-    if (isMockMode) {
-        localStorage.setItem('bd_mariner_demo_session', JSON.stringify(updatedUser));
-    } else {
-        try {
-            // Optimistic update
-            const { error } = await supabase.from('profiles').update({ is_open_for_work: newStatus }).eq('id', currentUser.id);
-            if (error) {
-                console.error(error);
-                // Revert on error
-                setCurrentUser(currentUser); 
-                alert("Failed to update status.");
-            } else {
-                localStorage.setItem(`bd_mariner_profile_${currentUser.id}`, JSON.stringify(updatedUser));
-            }
-        } catch (e) {
-            console.error("Update failed", e);
+    try {
+        // Optimistic update
+        const { error } = await supabase.from('profiles').update({ is_open_for_work: newStatus }).eq('id', currentUser.id);
+        if (error) {
+            console.error(error);
+            // Revert on error
+            setCurrentUser(currentUser); 
+            alert("Failed to update status.");
+        } else {
+            localStorage.setItem(`bd_mariner_profile_${currentUser.id}`, JSON.stringify(updatedUser));
         }
+    } catch (e) {
+        console.error("Update failed", e);
     }
   };
 
   const handleToggleOnboardStatus = async (onboardStatus: boolean) => {
     if (!currentUser || !currentUser.profile) return;
-    if (isOffline && !isMockMode) { alert("You are offline. Cannot update status."); return; }
+    if (isOffline) { alert("You are offline. Cannot update status."); return; }
 
     const updatedUser = {
         ...currentUser,
@@ -455,22 +344,18 @@ const App: React.FC = () => {
     };
     setCurrentUser(updatedUser);
 
-    if (isMockMode) {
-        localStorage.setItem('bd_mariner_demo_session', JSON.stringify(updatedUser));
-    } else {
-        try {
-            // Optimistic update
-            const { error } = await supabase.from('profiles').update({ is_onboard: onboardStatus }).eq('id', currentUser.id);
-            if (error) {
-                console.error(error);
-                setCurrentUser(currentUser); 
-                alert("Failed to update onboard status.");
-            } else {
-                localStorage.setItem(`bd_mariner_profile_${currentUser.id}`, JSON.stringify(updatedUser));
-            }
-        } catch (e) {
-            console.error("Update failed", e);
+    try {
+        // Optimistic update
+        const { error } = await supabase.from('profiles').update({ is_onboard: onboardStatus }).eq('id', currentUser.id);
+        if (error) {
+            console.error(error);
+            setCurrentUser(currentUser); 
+            alert("Failed to update onboard status.");
+        } else {
+            localStorage.setItem(`bd_mariner_profile_${currentUser.id}`, JSON.stringify(updatedUser));
         }
+    } catch (e) {
+        console.error("Update failed", e);
     }
   };
 
@@ -558,16 +443,6 @@ const App: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    if (isMockMode) {
-        localStorage.removeItem('bd_mariner_demo_session');
-        localStorage.removeItem('bd_mariner_admin_session');
-        setCurrentUser(null);
-        setCurrentView(AppView.LANDING);
-        // Clear login form
-        setEmail('');
-        setPassword('');
-        return;
-    }
     await supabase.auth.signOut();
   };
 
@@ -699,17 +574,6 @@ const App: React.FC = () => {
           <h2 className="mt-6 text-center text-3xl font-extrabold text-slate-900">
             {isLogin ? 'Welcome Back' : 'Create Account'}
           </h2>
-          {isMockMode && (
-             <p className="text-xs text-center text-amber-600 bg-amber-50 p-2 rounded mt-2 border border-amber-200">
-                ⚠️ Simulation Mode: Login with any details.
-             </p>
-          )}
-          {!isMockMode && !isConfigured && (
-             <div className="text-xs text-center text-red-600 bg-red-50 p-3 rounded mt-2 border border-red-200 flex flex-col items-center justify-center gap-2">
-                <div className="flex items-center font-bold"><AlertTriangle className="w-3 h-3 mr-1"/> Configuration Missing</div>
-                <span className="text-[10px] text-slate-600">Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file or build settings.</span>
-             </div>
-          )}
           {isOffline && (
              <p className="text-xs text-center text-red-600 bg-red-50 p-2 rounded mt-2 border border-red-200 flex items-center justify-center">
                 <WifiOff className="w-3 h-3 mr-1"/> Offline: Please check your internet.
@@ -726,7 +590,7 @@ const App: React.FC = () => {
               <div>
                 <button
                   type="submit"
-                  disabled={loading || (isOffline && !isMockMode) || (!isMockMode && !isConfigured)}
+                  disabled={loading || isOffline}
                   className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                   {loading ? (
@@ -823,7 +687,6 @@ const App: React.FC = () => {
           <div className="text-center mb-8">
              <h1 className="text-3xl font-bold text-white">{isEditing ? 'Update Profile' : 'Complete Your Profile'}</h1>
              <p className="text-blue-200 mt-2">{isEditing ? 'Keep your information up to date.' : "Let's get your professional profile ship-shape."}</p>
-             {isMockMode && <span className="inline-block mt-2 px-2 py-1 bg-amber-500/20 text-amber-200 text-xs rounded border border-amber-500/30">Simulation Mode</span>}
           </div>
 
           <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
