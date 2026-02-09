@@ -1,9 +1,25 @@
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { JobPosting } from "../types";
 
-// Initialize Gemini Client
-// The API key must be obtained exclusively from the environment variable process.env.API_KEY.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Lazy-initialize Gemini Client to prevent crash at module load when API key is missing.
+// The API key is read from the Vite env variable VITE_GEMINI_API_KEY or process.env.API_KEY.
+let _ai: GoogleGenAI | null = null;
+const getAI = (): GoogleGenAI => {
+  if (!_ai) {
+    const apiKey = (import.meta as any)?.env?.VITE_GEMINI_API_KEY
+      || (typeof process !== 'undefined' ? process.env?.API_KEY : undefined)
+      || '';
+
+    // Check if key is missing OR is the placeholder
+    if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY' || apiKey === 'PLACEHOLDER') {
+      console.warn("Gemini API Key is not set. AI features will be unavailable.");
+      throw new Error("Gemini API Key is missing or invalid (PLACEHOLDER). Please check .env.local");
+    }
+    _ai = new GoogleGenAI({ apiKey: apiKey });
+  }
+  return _ai;
+};
+
 
 export const getGeminiResponse = async (
   message: string,
@@ -11,9 +27,9 @@ export const getGeminiResponse = async (
 ): Promise<string> => {
   try {
     const model = 'gemini-3-flash-preview';
-    
+
     // Using chat to maintain simple context history
-    const chat = ai.chats.create({
+    const chat = getAI().chats.create({
       model: model,
       config: {
         systemInstruction: `You are "Sea Mate", an intelligent AI assistant specifically for Bangladeshi Mariners. 
@@ -60,7 +76,7 @@ export const analyzeDocumentImage = async (base64Image: string): Promise<Scanned
 
     // Gemini Multimodal supports these types via inlineData
     const supportedMimeTypes = [
-      'image/png', 'image/jpeg', 'image/webp', 'image/heic', 'image/heif', 
+      'image/png', 'image/jpeg', 'image/webp', 'image/heic', 'image/heif',
       'application/pdf'
     ];
 
@@ -73,13 +89,13 @@ export const analyzeDocumentImage = async (base64Image: string): Promise<Scanned
       };
     }
 
-    const response = await ai.models.generateContent({
+    const response = await getAI().models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: {
         parts: [
           {
             inlineData: {
-              mimeType: mimeType, 
+              mimeType: mimeType,
               data: base64Data
             }
           },
@@ -96,9 +112,9 @@ export const analyzeDocumentImage = async (base64Image: string): Promise<Scanned
             documentName: { type: Type.STRING },
             expiryDate: { type: Type.STRING, description: "YYYY-MM-DD or N/A" },
             documentNumber: { type: Type.STRING },
-            category: { 
-              type: Type.STRING, 
-              description: "One of: Certificate, License, Personal ID, Medical, Visa, Other" 
+            category: {
+              type: Type.STRING,
+              description: "One of: Certificate, License, Personal ID, Medical, Visa, Other"
             }
           },
           required: ["documentName", "expiryDate", "documentNumber", "category"]
@@ -128,7 +144,7 @@ export const analyzeDocumentImage = async (base64Image: string): Promise<Scanned
 
 export const parseJobPosting = async (text: string): Promise<Partial<JobPosting>> => {
   try {
-    const response = await ai.models.generateContent({
+    const response = await getAI().models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Extract maritime job details from the following unstructured text. Return JSON. Text: "${text}"`,
       config: {
