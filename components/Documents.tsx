@@ -355,11 +355,10 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
                 setIsScanning(false);
                 setIsScanning(false);
             } catch (error: any) {
-                console.error(error);
+                console.error("Scanning Error:", error);
                 setIsScanning(false);
-                if (error.message && (error.message.includes("API Key") || error.message.includes("PLACEHOLDER"))) {
-                    alert("AI Extraction Failed: " + error.message);
-                }
+                // Alert on ALL errors to help debugging
+                alert("Document Scan Failed: " + (error.message || "Unknown error"));
             }
         }, 100);
     };
@@ -587,8 +586,8 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
                         key={cat}
                         onClick={() => setActiveFilter(cat)}
                         className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border flex items-center ${activeFilter === cat
-                                ? 'bg-blue-600 text-white border-blue-600 shadow-md'
-                                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-md'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                             }`}
                     >
                         {cat === 'All' && <Filter className="w-3 h-3 mr-1.5" />}
@@ -894,8 +893,8 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
                                                 type="button"
                                                 onClick={() => setFormData({ ...formData, category: cat })}
                                                 className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${formData.category === cat
-                                                        ? 'bg-slate-800 text-white border-slate-800'
-                                                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+                                                    ? 'bg-slate-800 text-white border-slate-800'
+                                                    : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
                                                     }`}
                                             >
                                                 {cat}
