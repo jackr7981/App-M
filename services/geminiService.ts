@@ -64,8 +64,6 @@ export const analyzeDocumentImage = async (base64Image: string): Promise<Scanned
       'application/pdf'
     ];
 
-    // If file type is not supported for analysis (e.g. Word/Excel), return default empty data immediately
-    // The UI will handle filling the name with the filename.
     if (!supportedMimeTypes.includes(mimeType)) {
       return {
         documentName: "",
@@ -86,7 +84,7 @@ export const analyzeDocumentImage = async (base64Image: string): Promise<Scanned
             }
           },
           {
-            text: "Analyze this maritime document. Extract the Document Title, Expiry Date (in YYYY-MM-DD format), Document Number, and Classify the Category (Certificate, License, Personal ID, Medical, Visa, Other). If a field is not found, use 'N/A'."
+            text: "Analyze this maritime document. Extract the Document Title (e.g., CDC, COC), Expiry Date (YYYY-MM-DD), Document Number, and Classify the Category. Return JSON."
           }
         ]
       },
@@ -109,7 +107,12 @@ export const analyzeDocumentImage = async (base64Image: string): Promise<Scanned
     });
 
     if (response.text) {
-      return JSON.parse(response.text) as ScannedDocumentData;
+      let cleanText = response.text.trim();
+      // Remove markdown code blocks if present
+      if (cleanText.startsWith('```json')) {
+        cleanText = cleanText.replace(/```json/g, '').replace(/```/g, '');
+      }
+      return JSON.parse(cleanText) as ScannedDocumentData;
     }
     throw new Error("No data returned");
   } catch (error) {
@@ -127,22 +130,19 @@ export const parseJobPosting = async (text: string): Promise<Partial<JobPosting>
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Extract maritime job details from the following unstructured text (usually from WhatsApp/Telegram). 
-      Return a JSON object.
-      
-      Text: "${text}"`,
+      contents: `Extract maritime job details from the following unstructured text. Return JSON. Text: "${text}"`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            rank: { type: Type.STRING, description: "The rank required, e.g. Master, Chief Officer, Fitter" },
-            shipType: { type: Type.STRING, description: "Type of vessel, e.g. Bulk Carrier, Tanker" },
-            wage: { type: Type.STRING, description: "Salary or wages if mentioned" },
-            joiningDate: { type: Type.STRING, description: "When is the joining" },
-            description: { type: Type.STRING, description: "Short summary of the job" },
-            contactInfo: { type: Type.STRING, description: "Email or Phone number found" },
-            companyName: { type: Type.STRING, description: "Name of agency or company" }
+            rank: { type: Type.STRING },
+            shipType: { type: Type.STRING },
+            wage: { type: Type.STRING },
+            joiningDate: { type: Type.STRING },
+            description: { type: Type.STRING },
+            contactInfo: { type: Type.STRING },
+            companyName: { type: Type.STRING }
           },
           required: ["rank", "shipType", "description", "contactInfo"]
         }
@@ -150,7 +150,11 @@ export const parseJobPosting = async (text: string): Promise<Partial<JobPosting>
     });
 
     if (response.text) {
-      return JSON.parse(response.text) as Partial<JobPosting>;
+      let cleanText = response.text.trim();
+      if (cleanText.startsWith('```json')) {
+        cleanText = cleanText.replace(/```json/g, '').replace(/```/g, '');
+      }
+      return JSON.parse(cleanText) as Partial<JobPosting>;
     }
     throw new Error("Failed to parse job");
   } catch (error) {
