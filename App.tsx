@@ -4,7 +4,7 @@ import { Logo } from './components/Logo';
 import { Dashboard } from './components/Dashboard';
 import { AdminDashboard } from './components/AdminDashboard'; // Import Admin Dashboard
 import { ArrowRight, Mail, Lock, Upload, Calendar, Phone, CheckCircle, User as UserIcon, Loader2, Search, Globe, RefreshCw, ShieldCheck, X, AlertTriangle, WifiOff, Ship } from 'lucide-react';
-import { supabase, getStorageUrl, isMockMode } from './services/supabase';
+import { supabase, getStorageUrl, isMockMode, isConfigured } from './services/supabase';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.LANDING);
@@ -67,6 +67,12 @@ const App: React.FC = () => {
         return;
       }
 
+      if (!isConfigured) {
+        console.warn("Supabase not configured, skipping session check.");
+        setAuthChecking(false);
+        return;
+      }
+
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         
@@ -100,7 +106,7 @@ const App: React.FC = () => {
 
     checkSession();
 
-    if (!isMockMode) {
+    if (!isMockMode && isConfigured) {
         const {
         data: { subscription },
         } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -178,9 +184,20 @@ const App: React.FC = () => {
     }
   };
 
+  const handleAuthError = (error: any) => {
+    console.error(error);
+    if (error.message === 'Failed to fetch') {
+      alert("Connection Error: Unable to reach the server.\n\nPossible causes:\n1. Check your internet connection.\n2. Ensure Supabase URL is correct in settings.");
+    } else {
+      alert(error.message);
+    }
+  };
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isOffline) { alert("You are offline. Please connect to the internet to register."); return; }
+    if (!isMockMode && !isConfigured) { alert("App is not configured. Please add Supabase Credentials."); return; }
+    
     setLoading(true);
 
     if (isMockMode) {
@@ -200,27 +217,32 @@ const App: React.FC = () => {
        return;
     }
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
+    try {
+        const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+        });
 
-    if (error) {
-      alert(error.message);
-    } else {
-      if (data.session) {
-         // Do nothing, listener handles it
-      } else if (data.user) {
-         alert('Check your email for the verification link!');
-         setCurrentView(AppView.VERIFY_EMAIL);
-      }
+        if (error) throw error;
+
+        if (data.session) {
+            // Do nothing, listener handles it
+        } else if (data.user) {
+            alert('Check your email for the verification link!');
+            setCurrentView(AppView.VERIFY_EMAIL);
+        }
+    } catch (error: any) {
+        handleAuthError(error);
+    } finally {
+        setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isOffline && !isMockMode) { alert("You are offline. Please connect to the internet to login."); return; }
+    if (!isMockMode && !isConfigured) { alert("App is not configured. Please add Supabase Credentials."); return; }
+
     setLoading(true);
 
     // Hardcoded Admin Check
@@ -265,15 +287,17 @@ const App: React.FC = () => {
       return;
     }
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      alert(error.message);
+    try {
+        const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        });
+        if (error) throw error;
+    } catch (error: any) {
+        handleAuthError(error);
+    } finally {
+        setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
@@ -680,6 +704,12 @@ const App: React.FC = () => {
                 ⚠️ Simulation Mode: Login with any details.
              </p>
           )}
+          {!isMockMode && !isConfigured && (
+             <div className="text-xs text-center text-red-600 bg-red-50 p-3 rounded mt-2 border border-red-200 flex flex-col items-center justify-center gap-2">
+                <div className="flex items-center font-bold"><AlertTriangle className="w-3 h-3 mr-1"/> Configuration Missing</div>
+                <span className="text-[10px] text-slate-600">Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file or build settings.</span>
+             </div>
+          )}
           {isOffline && (
              <p className="text-xs text-center text-red-600 bg-red-50 p-2 rounded mt-2 border border-red-200 flex items-center justify-center">
                 <WifiOff className="w-3 h-3 mr-1"/> Offline: Please check your internet.
@@ -696,7 +726,7 @@ const App: React.FC = () => {
               <div>
                 <button
                   type="submit"
-                  disabled={loading || (isOffline && !isMockMode)}
+                  disabled={loading || (isOffline && !isMockMode) || (!isMockMode && !isConfigured)}
                   className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                   {loading ? (
