@@ -2,9 +2,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const BASE_URL = "https://erp.gso.gov.bd";
+const HTTP_BASE_URL = "http://erp.gso.gov.bd"; // HTTP fallback for TLS issues
 const SEARCH_PAGE = `${BASE_URL}/cdc-search/`;
 const SEARCH_ACTION = `${BASE_URL}/frontend/web/cdc-search`;
-const CAPTCHA_BASE = `${BASE_URL}/frontend/web/site/captcha`;
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -13,19 +13,34 @@ const corsHeaders = {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// Wrapper: try HTTPS first, fall back to HTTP if TLS cert fails
+async function fetchGov(url: string, init?: RequestInit): Promise<Response> {
+    try {
+        return await fetch(url, init);
+    } catch (err: unknown) {
+        const msg = (err as Error).message || "";
+        if (
+            msg.includes("UnknownIssuer") ||
+            msg.includes("certificate") ||
+            msg.includes("tls")
+        ) {
+            const httpUrl = url.replace("https://", "http://");
+            return await fetch(httpUrl, init);
+        }
+        throw err;
+    }
+}
+
 // ─── Helpers ───────────────────────────────────────────────
 
 /** Extract all Set-Cookie headers and return them as a single cookie string */
 function extractCookies(response: Response): string {
     const cookies: string[] = [];
-    // getSetCookie() returns an array of Set-Cookie header values
     const setCookieHeaders = response.headers.getSetCookie?.() ?? [];
     for (const sc of setCookieHeaders) {
-        // Take only the name=value part (before ;)
         const nameValue = sc.split(";")[0].trim();
         if (nameValue) cookies.push(nameValue);
     }
-    // Fallback: try the raw header
     if (cookies.length === 0) {
         const raw = response.headers.get("set-cookie");
         if (raw) {
@@ -75,7 +90,7 @@ function stripTags(html: string): string {
 async function fetchCaptcha(): Promise<Response> {
     try {
         // Step 1: GET the search page to obtain CSRF token & session cookies
-        const pageRes = await fetch(SEARCH_PAGE, {
+        const pageRes = await fetchGov(SEARCH_PAGE, {
             headers: {
                 "User-Agent":
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -87,7 +102,10 @@ async function fetchCaptcha(): Promise<Response> {
 
         if (!pageRes.ok) {
             return jsonResponse(
-                { success: false, error: `Failed to load search page: ${pageRes.status}` },
+                {
+                    success: false,
+                    error: `Failed to load search page: ${pageRes.status}`,
+                },
                 500
             );
         }
@@ -114,7 +132,10 @@ async function fetchCaptcha(): Promise<Response> {
         );
         if (!captchaImgMatch) {
             return jsonResponse(
-                { success: false, error: "Could not find CAPTCHA image on search page" },
+                {
+                    success: false,
+                    error: "Could not find CAPTCHA image on search page",
+                },
                 500
             );
         }
@@ -124,7 +145,7 @@ async function fetchCaptcha(): Promise<Response> {
         }
 
         // Step 4: Fetch the CAPTCHA image with session cookies
-        const imgRes = await fetch(captchaUrl, {
+        const imgRes = await fetchGov(captchaUrl, {
             headers: {
                 Cookie: sessionCookies,
                 "User-Agent":
@@ -135,7 +156,10 @@ async function fetchCaptcha(): Promise<Response> {
 
         if (!imgRes.ok) {
             return jsonResponse(
-                { success: false, error: `Failed to fetch CAPTCHA image: ${imgRes.status}` },
+                {
+                    success: false,
+                    error: `Failed to fetch CAPTCHA image: ${imgRes.status}`,
+                },
                 500
             );
         }
@@ -148,9 +172,7 @@ async function fetchCaptcha(): Promise<Response> {
 
         // Step 5: Convert image to base64
         const imgBuffer = await imgRes.arrayBuffer();
-        const base64 = btoa(
-            String.fromCharCode(...new Uint8Array(imgBuffer))
-        );
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(imgBuffer)));
         const contentType = imgRes.headers.get("content-type") || "image/png";
         const captchaImage = `data:${contentType};base64,${base64}`;
 
@@ -163,7 +185,10 @@ async function fetchCaptcha(): Promise<Response> {
         });
     } catch (err) {
         return jsonResponse(
-            { success: false, error: `fetch_captcha error: ${(err as Error).message}` },
+            {
+                success: false,
+                error: `fetch_captcha error: ${(err as Error).message}`,
+            },
             500
         );
     }
@@ -209,7 +234,7 @@ async function submitVerification(body: {
         formData.set("CdcSearchForm[date_of_birth]", dob);
         formData.set("CdcSearchForm[captcha]", captcha);
 
-        const searchRes = await fetch(SEARCH_ACTION, {
+        const searchRes = await fetchGov(SEARCH_ACTION, {
             method: "POST",
             headers: {
                 "Content-Type": "application/x-www-form-urlencoded",
@@ -242,12 +267,11 @@ async function submitVerification(body: {
         const resultsHtml = await searchRes.text();
 
         // ── Step 2: Check for errors ──────────────────────────
-        // Check for CAPTCHA error
         if (
             resultsHtml.includes("The verification code is incorrect") ||
-            resultsHtml.includes("captcha") && resultsHtml.includes("help-block")
+            (resultsHtml.includes("captcha") &&
+                resultsHtml.includes("help-block"))
         ) {
-            // Try to extract the specific error message
             const errorMatch = resultsHtml.match(
                 /class="help-block"[^>]*>([^<]*)</
             );
@@ -261,9 +285,10 @@ async function submitVerification(body: {
         }
 
         // ── Step 3: Parse results table ───────────────────────
-        const tableMatch = resultsHtml.match(/<table[^>]*>([\s\S]*?)<\/table>/gi);
+        const tableMatch = resultsHtml.match(
+            /<table[^>]*>([\s\S]*?)<\/table>/gi
+        );
         if (!tableMatch || tableMatch.length === 0) {
-            // Maybe no results found
             if (
                 resultsHtml.includes("No results found") ||
                 resultsHtml.includes("no record")
@@ -276,28 +301,28 @@ async function submitVerification(body: {
             }
             return jsonResponse({
                 success: false,
-                error: "Could not find results table in response. The search may have failed.",
+                error:
+                    "Could not find results table in response. The search may have failed.",
                 errorType: "parse_error",
                 rawHtmlSnippet: resultsHtml.substring(0, 2000),
             });
         }
 
-        // Parse the results table — find all rows
-        const resultsTable = tableMatch[tableMatch.length - 1]; // Last table is likely the data table
-        const rowMatches = resultsTable.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
+        // Parse the results table
+        const resultsTable = tableMatch[tableMatch.length - 1];
+        const rowMatches =
+            resultsTable.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
 
         const resultRows: Record<string, string>[] = [];
         let headers: string[] = [];
 
         for (const rowHtml of rowMatches) {
-            // Check if header row
             const thMatches = rowHtml.match(/<th[^>]*>([\s\S]*?)<\/th>/gi);
             if (thMatches && thMatches.length > 0) {
                 headers = thMatches.map((th) => stripTags(th).toUpperCase());
                 continue;
             }
 
-            // Data row
             const tdMatches = rowHtml.match(/<td[^>]*>([\s\S]*?)<\/td>/gi);
             if (tdMatches && tdMatches.length > 0) {
                 const row: Record<string, string> = {};
@@ -310,10 +335,8 @@ async function submitVerification(body: {
         }
 
         // ── Step 4: Extract Details button URL ────────────────
-        // Look for a link or button in the results that leads to details
         let detailsUrl: string | null = null;
 
-        // Pattern 1: <a href="..." class="...btn...">Details</a>
         const detailsLinkMatch = resultsHtml.match(
             /<a[^>]*href="([^"]*)"[^>]*>[\s\S]*?(?:Details|View|detail)[\s\S]*?<\/a>/i
         );
@@ -321,7 +344,6 @@ async function submitVerification(body: {
             detailsUrl = detailsLinkMatch[1];
         }
 
-        // Pattern 2: Look in the last column of the results table
         if (!detailsUrl && tableMatch) {
             const lastTdLinks = resultsTable.match(
                 /<a[^>]*href="([^"]*)"[^>]*>/gi
@@ -335,7 +357,6 @@ async function submitVerification(body: {
         }
 
         if (!detailsUrl) {
-            // Return what we have from the results table
             return jsonResponse({
                 success: true,
                 cdcInfo: {
@@ -354,7 +375,7 @@ async function submitVerification(body: {
         }
 
         // ── Step 5: GET the details page ──────────────────────
-        const detailsRes = await fetch(detailsUrl, {
+        const detailsRes = await fetchGov(detailsUrl, {
             headers: {
                 Cookie: currentCookies,
                 "User-Agent":
@@ -401,9 +422,7 @@ function parseDetailsPage(
 ): Record<string, unknown> {
     const info: Record<string, string> = {};
 
-    // Strategy 1: Look for table rows with label-value pairs
-    // <tr><th>Label</th><td>Value</td></tr>
-    // or <tr><td>Label</td><td>Value</td></tr>
+    // Strategy 1: table rows with label-value pairs
     const pairRows =
         html.match(
             /<tr[^>]*>\s*<t[hd][^>]*>([\s\S]*?)<\/t[hd]>\s*<td[^>]*>([\s\S]*?)<\/td>\s*<\/tr>/gi
@@ -412,9 +431,7 @@ function parseDetailsPage(
     for (const row of pairRows) {
         const cells = row.match(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/gi);
         if (cells && cells.length >= 2) {
-            const key = stripTags(cells[0])
-                .replace(/:/g, "")
-                .trim();
+            const key = stripTags(cells[0]).replace(/:/g, "").trim();
             const value = stripTags(cells[1]).trim();
             if (key && value && key.length < 60) {
                 info[key] = value;
@@ -422,26 +439,23 @@ function parseDetailsPage(
         }
     }
 
-    // Strategy 2: Look for definition lists <dt>Label</dt><dd>Value</dd>
+    // Strategy 2: definition lists
     const dtMatches =
-        html.match(/<dt[^>]*>([\s\S]*?)<\/dt>\s*<dd[^>]*>([\s\S]*?)<\/dd>/gi) ||
-        [];
+        html.match(
+            /<dt[^>]*>([\s\S]*?)<\/dt>\s*<dd[^>]*>([\s\S]*?)<\/dd>/gi
+        ) || [];
     for (const dt of dtMatches) {
         const parts = dt.match(
             /<dt[^>]*>([\s\S]*?)<\/dt>\s*<dd[^>]*>([\s\S]*?)<\/dd>/i
         );
         if (parts) {
-            const key = stripTags(parts[1])
-                .replace(/:/g, "")
-                .trim();
+            const key = stripTags(parts[1]).replace(/:/g, "").trim();
             const value = stripTags(parts[2]).trim();
-            if (key && value) {
-                info[key] = value;
-            }
+            if (key && value) info[key] = value;
         }
     }
 
-    // Strategy 3: Look for div.form-group or similar label-value patterns
+    // Strategy 3: form-group label-value patterns
     const formGroups =
         html.match(
             /<label[^>]*>([\s\S]*?)<\/label>\s*[\s\S]*?<(?:span|p|div|input)[^>]*>([\s\S]*?)<\/(?:span|p|div|input)>/gi
@@ -452,36 +466,25 @@ function parseDetailsPage(
             /<(?:span|p|div)[^>]*class="[^"]*(?:form-control|value|detail)[^"]*"[^>]*>([\s\S]*?)<\/(?:span|p|div)>/i
         );
         if (labelMatch && valueMatch) {
-            const key = stripTags(labelMatch[1])
-                .replace(/:/g, "")
-                .trim();
+            const key = stripTags(labelMatch[1]).replace(/:/g, "").trim();
             const value = stripTags(valueMatch[1]).trim();
-            if (key && value) {
-                info[key] = value;
-            }
+            if (key && value) info[key] = value;
         }
     }
 
-    // Strategy 4: Look for detail-view widget (Yii2 DetailView)
-    // Yii2 renders details as <table class="table table-striped table-bordered detail-view">
+    // Strategy 4: Yii2 DetailView widget
     const detailViewMatch = html.match(
         /<table[^>]*class="[^"]*detail-view[^"]*"[^>]*>([\s\S]*?)<\/table>/i
     );
     if (detailViewMatch) {
         const dvRows =
-            detailViewMatch[1].match(
-                /<tr[^>]*>([\s\S]*?)<\/tr>/gi
-            ) || [];
+            detailViewMatch[1].match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
         for (const row of dvRows) {
             const cells = row.match(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/gi);
             if (cells && cells.length >= 2) {
-                const key = stripTags(cells[0])
-                    .replace(/:/g, "")
-                    .trim();
+                const key = stripTags(cells[0]).replace(/:/g, "").trim();
                 const value = stripTags(cells[1]).trim();
-                if (key && value) {
-                    info[key] = value;
-                }
+                if (key && value) info[key] = value;
             }
         }
     }
