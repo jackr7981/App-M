@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, UserProfile, ShipType, Rank, DocumentCategory, MarinerDocument, Department } from '../types';
-import { LogOut, Users, FileCheck, Anchor, Search, ChevronRight, ArrowLeft, BarChart, Shield, HardDrive, Database, FileText } from 'lucide-react';
+import { LogOut, Users, FileCheck, Anchor, Search, ChevronRight, ArrowLeft, BarChart, Shield, HardDrive, Database, FileText, Clock } from 'lucide-react';
 import { Documents } from './Documents';
 import { supabase, isMockMode } from '../services/supabase';
 
@@ -14,6 +14,7 @@ interface UserStorageInfo {
     rank: string;
     docCount: number;
     totalSizeBytes: number;
+    usageMinutes: number;
 }
 
 // Generate Mock Data for Admin View
@@ -136,7 +137,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                 } else {
                     // Real query: documents grouped by user
                     const { data: docs } = await supabase.from('documents').select('user_id, file_path, title, category');
-                    const { data: profiles } = await supabase.from('profiles').select('id, first_name, last_name, rank');
+                    const { data: profiles } = await supabase.from('profiles').select('id, first_name, last_name, rank, total_usage_minutes');
                     if (docs && profiles) {
                         setTotalDocs(docs.length);
                         const profileMap = new Map(profiles.map((p: any) => [p.id, p]));
@@ -149,14 +150,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                             userMap.set(d.user_id, prev);
                         });
                         const stats: UserStorageInfo[] = [];
-                        userMap.forEach((val, uid) => {
-                            const p = profileMap.get(uid) as any;
+                        profiles.forEach((p: any) => { // Iterate over profiles to include usage even if no docs
+                            const val = userMap.get(p.id) || { count: 0, size: 0 };
                             stats.push({
-                                userId: uid,
-                                userName: p ? `${p.first_name} ${p.last_name}` : 'Unknown',
-                                rank: p?.rank || 'N/A',
+                                userId: p.id,
+                                userName: `${p.first_name || ''} ${p.last_name || ''}`,
+                                rank: p.rank || 'N/A',
                                 docCount: val.count,
-                                totalSizeBytes: val.size
+                                totalSizeBytes: val.size,
+                                usageMinutes: p.total_usage_minutes || 0
                             });
                         });
                         stats.sort((a, b) => b.totalSizeBytes - a.totalSizeBytes);
@@ -220,6 +222,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
 
     const totalStorageBytes = useMemo(() => {
         return storageStats.reduce((s, u) => s + u.totalSizeBytes, 0);
+    }, [storageStats]);
+
+    const totalUsageHours = useMemo(() => {
+        const minutes = storageStats.reduce((s, u) => s + (u.usageMinutes || 0), 0);
+        return (minutes / 60).toFixed(1);
     }, [storageStats]);
 
     const formatBytes = (bytes: number) => {
@@ -291,7 +298,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                         onClick={() => setActiveTab('storage')}
                         className={`px-6 py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'storage' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                     >
-                        <HardDrive className="w-4 h-4 inline-block mr-2" /> Storage
+                        <HardDrive className="w-4 h-4 inline-block mr-2" /> Usage & Storage
                     </button>
                 </div>
             </div>
@@ -311,6 +318,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                             </div>
                             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
                                 <div className="flex justify-between items-center mb-3">
+                                    <h3 className="text-slate-500 font-medium text-xs">Total User Time</h3>
+                                    <Clock className="w-4 h-4 text-pink-500" />
+                                </div>
+                                <p className="text-2xl font-bold text-slate-800">{totalUsageHours} hrs</p>
+                            </div>
+                            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                                <div className="flex justify-between items-center mb-3">
                                     <h3 className="text-slate-500 font-medium text-xs">Ready for Sea</h3>
                                     <Anchor className="w-4 h-4 text-emerald-500" />
                                 </div>
@@ -322,13 +336,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                     <FileText className="w-4 h-4 text-violet-500" />
                                 </div>
                                 <p className="text-2xl font-bold text-slate-800">{totalDocs}</p>
-                            </div>
-                            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-                                <div className="flex justify-between items-center mb-3">
-                                    <h3 className="text-slate-500 font-medium text-xs">Total Storage</h3>
-                                    <HardDrive className="w-4 h-4 text-amber-500" />
-                                </div>
-                                <p className="text-2xl font-bold text-slate-800">{formatBytes(totalStorageBytes)}</p>
                             </div>
                         </div>
 
@@ -464,9 +471,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                         <tr>
                                             <th className="p-4">User</th>
                                             <th className="p-4">Rank</th>
+                                            <th className="p-4 text-right">Time Spent</th>
                                             <th className="p-4 text-right">Documents</th>
                                             <th className="p-4 text-right">Storage</th>
-                                            <th className="p-4 text-right">% of Total</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -476,19 +483,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                                     <span className="font-bold text-slate-800">{u.userName}</span>
                                                 </td>
                                                 <td className="p-4 text-sm text-slate-600">{u.rank}</td>
+                                                <td className="p-4 text-right">
+                                                    <span className="font-bold text-sm text-blue-600">
+                                                        {u.usageMinutes < 60 ? `${u.usageMinutes || 0}m` : `${((u.usageMinutes || 0) / 60).toFixed(1)}h`}
+                                                    </span>
+                                                </td>
                                                 <td className="p-4 text-right font-mono text-sm text-slate-700">{u.docCount}</td>
                                                 <td className="p-4 text-right">
                                                     <span className="font-bold text-sm text-slate-800">{formatBytes(u.totalSizeBytes)}</span>
-                                                </td>
-                                                <td className="p-4 text-right">
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${totalStorageBytes > 0 ? (u.totalSizeBytes / totalStorageBytes) * 100 : 0}%` }}></div>
-                                                        </div>
-                                                        <span className="text-xs text-slate-500 w-10 text-right">
-                                                            {totalStorageBytes > 0 ? ((u.totalSizeBytes / totalStorageBytes) * 100).toFixed(1) : 0}%
-                                                        </span>
-                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}

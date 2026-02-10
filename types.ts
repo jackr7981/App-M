@@ -28,7 +28,7 @@ export enum Rank {
   THIRD_OFFICER = '3rd Officer',
   FOURTH_OFFICER = '4th Officer',
   DECK_CADET = 'Deck Cadet',
-  
+
   // Engine
   CHIEF_ENGINEER = 'Chief Engineer',
   SECOND_ENGINEER = '2nd Engineer',
@@ -36,10 +36,10 @@ export enum Rank {
   FOURTH_ENGINEER = '4th Engineer',
   FIFTH_ENGINEER = '5th Engineer',
   ENGINE_CADET = 'Engine Cadet',
-  
+
   // Electrical
   ELECTRICAL_OFFICER = 'Electrical Officer (ETO)',
-  
+
   // Ratings
   BOSUN = 'Bosun',
   ABLE_SEAMAN = 'Able Seaman',
@@ -49,11 +49,11 @@ export enum Rank {
   OILER = 'Oiler',
   WIPER = 'Wiper',
   WELDER = 'Welder',
-  
+
   // Galley
   CHIEF_COOK = 'Chief Cook',
   MESSMAN = 'Messman',
-  
+
   // Others
   CREW_MANAGER = 'Crew Manager',
   AGENT = 'Agent',
@@ -108,6 +108,7 @@ export interface UserProfile {
   preferredShipType?: ShipType | string;
   isOpenForWork?: boolean;
   isOnboard?: boolean; // New field: true = At Sea, false = At Home
+  totalUsageMinutes?: number; // Total time spent in app
 }
 
 export interface User {
@@ -216,7 +217,7 @@ export interface ChatMessage {
 export type MoodType = 'Great' | 'Good' | 'Okay' | 'Stressed' | 'Exhausted';
 
 export interface MoodEntry {
-    id: string;
-    timestamp: number;
-    mood: MoodType;
+  id: string;
+  timestamp: number;
+  mood: MoodType;
 }
