@@ -37,13 +37,9 @@ const App: React.FC = () => {
   // DOS Import States
   const [showDosModal, setShowDosModal] = useState(false);
   const [dosLoading, setDosLoading] = useState(false);
-  const [dosCaptcha, setDosCaptcha] = useState('');
+  const [dosUrl, setDosUrl] = useState('');
   const [dosError, setDosError] = useState<string | null>(null);
-  const [dosStep, setDosStep] = useState<'captcha' | 'fetching' | 'success'>('captcha');
-  const [captchaImage, setCaptchaImage] = useState<string | null>(null);
-  const [csrfToken, setCsrfToken] = useState('');
-  const [csrfName, setCsrfName] = useState('_csrf-search');
-  const [sessionCookies, setSessionCookies] = useState('');
+  const [dosStep, setDosStep] = useState<'instructions' | 'paste_url' | 'fetching' | 'success'>('instructions');
 
   useEffect(() => {
     // Network Status Listeners
@@ -486,9 +482,10 @@ const App: React.FC = () => {
 
   // CDC VERIFY EDGE FUNCTION URL
   const CDC_VERIFY_URL = 'https://zlgfadgwlwreezwegpkx.supabase.co/functions/v1/cdc-verify';
+  const DOS_WEBSITE_URL = 'https://erp.gso.gov.bd/cdc-search/';
 
   // DOS IMPORT LOGIC
-  const openDosModal = async () => {
+  const openDosModal = () => {
     if (isOffline) {
       alert("DOS Import requires internet connection.");
       return;
@@ -497,80 +494,41 @@ const App: React.FC = () => {
       alert("Please enter your CDC Number and Date of Birth first.");
       return;
     }
-    setDosStep('captcha');
-    setDosCaptcha('');
+    setDosStep('instructions');
+    setDosUrl('');
     setDosError(null);
-    setCaptchaImage(null);
     setShowDosModal(true);
-    setDosLoading(true);
+  };
 
-    try {
-      const res = await fetch(CDC_VERIFY_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'fetch_captcha' }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setCaptchaImage(data.captchaImage);
-        setCsrfToken(data.csrfToken);
-        setCsrfName(data.csrfName || '_csrf-search');
-        setSessionCookies(data.sessionCookies);
-      } else {
-        setDosError(data.error || 'Failed to load CAPTCHA. Please try again.');
-      }
-    } catch (err) {
-      setDosError('Network error: Could not reach verification server.');
-    } finally {
-      setDosLoading(false);
-    }
+  const openDosWebsite = () => {
+    window.open(DOS_WEBSITE_URL, '_blank');
+    setDosStep('paste_url');
   };
 
   const handleDosSubmit = async () => {
-    setDosLoading(true);
-    setDosError(null);
-
-    if (!dosCaptcha) {
-      setDosError('Please enter the verification code.');
-      setDosLoading(false);
+    if (!dosUrl.trim()) {
+      setDosError('Please paste the details page URL.');
       return;
     }
 
+    setDosLoading(true);
+    setDosError(null);
+    setDosStep('fetching');
+
     try {
-      // Format DOB from YYYY-MM-DD to dd-mm-yyyy
-      const dobParts = profileData.dateOfBirth.split('-');
-      const formattedDob = dobParts.length === 3
-        ? `${dobParts[2]}-${dobParts[1]}-${dobParts[0]}`
-        : profileData.dateOfBirth;
-
-      setDosStep('fetching');
-
       const res = await fetch(CDC_VERIFY_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'submit_verification',
-          cdcNumber: profileData.cdcNumber,
-          dob: formattedDob,
-          captcha: dosCaptcha,
-          csrfToken,
-          csrfName,
-          sessionCookies,
+          action: 'scrape_details',
+          url: dosUrl.trim(),
         }),
       });
       const data = await res.json();
 
       if (!data.success) {
-        if (data.errorType === 'captcha_invalid') {
-          setDosStep('captcha');
-          setDosCaptcha('');
-          setDosError('Invalid CAPTCHA. Please try again.');
-          // Re-fetch captcha
-          openDosModal();
-        } else {
-          setDosStep('captcha');
-          setDosError(data.error || 'Verification failed.');
-        }
+        setDosStep('paste_url');
+        setDosError(data.error || 'Failed to fetch data from the provided URL.');
         setDosLoading(false);
         return;
       }
@@ -581,21 +539,25 @@ const App: React.FC = () => {
         const details = cdcInfo.details;
         setProfileData(prev => ({
           ...prev,
-          firstName: details['Name'] || details['SEAFARER NAME'] || details['Seafarer Name'] || prev.firstName,
-          lastName: details['Surname'] || prev.lastName,
+          firstName: details['Name'] || details['SEAFARER NAME'] || details['Seafarer Name'] || details['name'] || prev.firstName,
+          lastName: details['Surname'] || details['surname'] || prev.lastName,
         }));
+      } else if (cdcInfo?.note) {
+        setDosStep('paste_url');
+        setDosError(cdcInfo.note);
+        setDosLoading(false);
+        return;
       }
 
       setDosStep('success');
       setDosLoading(false);
 
-      // Close modal after success
       setTimeout(() => {
         setShowDosModal(false);
       }, 2500);
 
     } catch (err) {
-      setDosStep('captcha');
+      setDosStep('paste_url');
       setDosError('Network error: Could not reach verification server.');
       setDosLoading(false);
     }
@@ -1071,54 +1033,79 @@ const App: React.FC = () => {
 
               <div className="bg-blue-900 p-4 text-white flex justify-between items-center">
                 <h3 className="font-bold flex items-center gap-2">
-                  <Globe className="w-5 h-5 text-blue-300" /> DOS Verification
+                  <Globe className="w-5 h-5 text-blue-300" /> DOS Import
                 </h3>
                 <button onClick={() => setShowDosModal(false)} disabled={dosLoading} className="p-1 hover:bg-blue-800 rounded-full transition-colors"><X className="w-5 h-5" /></button>
               </div>
 
               <div className="p-6">
-                {dosStep === 'captcha' && (
+                {dosStep === 'instructions' && (
                   <div className="space-y-4">
                     <p className="text-sm text-slate-600">
-                      Verify your identity with the Department of Shipping database to auto-fill your profile.
+                      Import your CDC information from the Department of Shipping website.
                     </p>
 
-                    <div className="bg-slate-100 p-4 rounded-xl border border-slate-200 flex flex-col items-center gap-2">
-                      {captchaImage ? (
-                        <img src={captchaImage} alt="CAPTCHA" className="rounded-lg border border-slate-300" />
-                      ) : dosLoading ? (
-                        <div className="bg-white px-6 py-4 rounded-lg border border-slate-300 flex items-center gap-2">
-                          <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-                          <span className="text-sm text-slate-500">Loading CAPTCHA...</span>
-                        </div>
-                      ) : (
-                        <div className="bg-white px-6 py-4 rounded-lg border border-red-200 text-sm text-red-500">
-                          Failed to load CAPTCHA
-                        </div>
-                      )}
-                      <p className="text-[10px] text-slate-400">Security Code from DOS Server</p>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Enter Code</label>
-                      <input
-                        type="text"
-                        value={dosCaptcha}
-                        onChange={(e) => setDosCaptcha(e.target.value)}
-                        className="w-full text-center text-lg tracking-widest p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Enter code shown above"
-                        maxLength={10}
-                      />
-                      {dosError && <p className="text-xs text-red-500 mt-2 font-medium flex items-center justify-center"><AlertTriangle className="w-3 h-3 mr-1" /> {dosError}</p>}
+                    <div className="bg-blue-50 rounded-xl p-4 space-y-3 border border-blue-100">
+                      <div className="flex items-start gap-3">
+                        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">1</span>
+                        <p className="text-sm text-slate-700">Click the button below to open the DOS website</p>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">2</span>
+                        <p className="text-sm text-slate-700">Enter your CDC Number: <strong>{profileData.cdcNumber}</strong>, Date of Birth: <strong>{profileData.dateOfBirth}</strong>, and solve the CAPTCHA</p>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">3</span>
+                        <p className="text-sm text-slate-700">Click <strong>"Details"</strong> on the results page</p>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">4</span>
+                        <p className="text-sm text-slate-700">Copy the page URL from your browser and paste it here</p>
+                      </div>
                     </div>
 
                     <button
-                      onClick={handleDosSubmit}
-                      disabled={dosLoading || dosCaptcha.length === 0 || !captchaImage}
-                      className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-2"
+                      onClick={openDosWebsite}
+                      className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-900/20 transition-all flex items-center justify-center gap-2"
                     >
-                      {dosLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Verify & Fetch Data'}
+                      <Globe className="w-5 h-5" /> Open DOS Website
                     </button>
+                  </div>
+                )}
+
+                {dosStep === 'paste_url' && (
+                  <div className="space-y-4">
+                    <p className="text-sm text-slate-600">
+                      After you reach the <strong>CDC Details page</strong>, copy the URL from your browser's address bar and paste it below.
+                    </p>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Details Page URL</label>
+                      <input
+                        type="url"
+                        value={dosUrl}
+                        onChange={(e) => setDosUrl(e.target.value)}
+                        className="w-full text-sm p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="https://erp.gso.gov.bd/frontend/web/cdc-search/view?id=..."
+                      />
+                      {dosError && <p className="text-xs text-red-500 mt-2 font-medium flex items-center"><AlertTriangle className="w-3 h-3 mr-1" /> {dosError}</p>}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => window.open(DOS_WEBSITE_URL, '_blank')}
+                        className="flex-1 py-2.5 border border-slate-300 text-slate-700 rounded-xl font-medium hover:bg-slate-50 transition-all text-sm"
+                      >
+                        Reopen Website
+                      </button>
+                      <button
+                        onClick={handleDosSubmit}
+                        disabled={dosLoading || !dosUrl.trim()}
+                        className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm"
+                      >
+                        {dosLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Fetch Data'}
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -1130,8 +1117,8 @@ const App: React.FC = () => {
                       <Anchor className="absolute inset-0 m-auto w-6 h-6 text-blue-600 animate-pulse" />
                     </div>
                     <div>
-                      <h4 className="font-bold text-slate-800">Connecting to DOS Server...</h4>
-                      <p className="text-xs text-slate-500 mt-1">Fetching seafarer details for CDC: {profileData.cdcNumber}</p>
+                      <h4 className="font-bold text-slate-800">Fetching CDC Details...</h4>
+                      <p className="text-xs text-slate-500 mt-1">Parsing information from the DOS website</p>
                     </div>
                   </div>
                 )}
@@ -1142,9 +1129,9 @@ const App: React.FC = () => {
                       <CheckCircle className="w-8 h-8" />
                     </div>
                     <div>
-                      <h4 className="font-bold text-slate-800 text-lg">Data Found!</h4>
+                      <h4 className="font-bold text-slate-800 text-lg">Data Imported!</h4>
                       <p className="text-sm text-slate-600 mt-1">
-                        We successfully retrieved your profile and sea service records.
+                        Your CDC information has been imported to your profile.
                       </p>
                     </div>
                   </div>

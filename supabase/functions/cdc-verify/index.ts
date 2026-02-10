@@ -506,6 +506,124 @@ function parseDetailsPage(
     };
 }
 
+// ─── Action 3: Scrape Details URL ─────────────────────────
+
+async function scrapeDetails(body: { url: string }): Promise<Response> {
+    const { url } = body;
+    if (!url) {
+        return jsonResponse(
+            { success: false, error: "Missing required field: url" },
+            400
+        );
+    }
+
+    // Validate that it looks like a DOS/GSO URL
+    if (
+        !url.includes("gso.gov.bd") &&
+        !url.includes("erp.gso") &&
+        !url.includes("cdc-search")
+    ) {
+        return jsonResponse(
+            {
+                success: false,
+                error:
+                    "Invalid URL. Please provide a URL from the DOS (erp.gso.gov.bd) website.",
+            },
+            400
+        );
+    }
+
+    try {
+        const res = await fetchGov(url, {
+            headers: {
+                "User-Agent":
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                Accept:
+                    "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            },
+            redirect: "follow",
+        });
+
+        if (!res.ok) {
+            return jsonResponse(
+                {
+                    success: false,
+                    error: `Failed to fetch page: HTTP ${res.status}. The page may require an active session.`,
+                },
+                500
+            );
+        }
+
+        const html = await res.text();
+        const cdcInfo = parseDetailsPage(html, []);
+
+        if (
+            !cdcInfo.detailsAvailable ||
+            Object.keys(cdcInfo.details as Record<string, string>).length === 0
+        ) {
+            // Maybe the URL was the search results page, try to parse tables
+            const tableMatch = html.match(
+                /<table[^>]*>([\s\S]*?)<\/table>/gi
+            );
+            if (tableMatch) {
+                const resultsTable = tableMatch[tableMatch.length - 1];
+                const rowMatches =
+                    resultsTable.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
+                const resultRows: Record<string, string>[] = [];
+                let headers: string[] = [];
+
+                for (const rowHtml of rowMatches) {
+                    const thMatches = rowHtml.match(/<th[^>]*>([\s\S]*?)<\/th>/gi);
+                    if (thMatches && thMatches.length > 0) {
+                        headers = thMatches.map((th) => stripTags(th).toUpperCase());
+                        continue;
+                    }
+                    const tdMatches = rowHtml.match(/<td[^>]*>([\s\S]*?)<\/td>/gi);
+                    if (tdMatches && tdMatches.length > 0) {
+                        const row: Record<string, string> = {};
+                        tdMatches.forEach((td, idx) => {
+                            const key = headers[idx] || `col_${idx}`;
+                            row[key] = stripTags(td);
+                        });
+                        resultRows.push(row);
+                    }
+                }
+
+                if (resultRows.length > 0) {
+                    return jsonResponse({
+                        success: true,
+                        cdcInfo: {
+                            searchResults: resultRows,
+                            details: {},
+                            detailsAvailable: false,
+                            note: "This appears to be a search results page, not a details page. Please navigate to the details page and paste that URL instead.",
+                        },
+                    });
+                }
+            }
+
+            return jsonResponse({
+                success: false,
+                error:
+                    "Could not extract CDC details from this page. Make sure you are on the CDC details/view page.",
+            });
+        }
+
+        return jsonResponse({
+            success: true,
+            cdcInfo,
+        });
+    } catch (err) {
+        return jsonResponse(
+            {
+                success: false,
+                error: `scrape_details error: ${(err as Error).message}`,
+            },
+            500
+        );
+    }
+}
+
 // ─── Response helper ──────────────────────────────────────
 
 function jsonResponse(data: unknown, status = 200): Response {
@@ -541,10 +659,13 @@ Deno.serve(async (req: Request) => {
             case "submit_verification":
                 return await submitVerification(body);
 
+            case "scrape_details":
+                return await scrapeDetails(body);
+
             default:
                 return jsonResponse(
                     {
-                        error: `Unknown action: "${action}". Use "fetch_captcha" or "submit_verification".`,
+                        error: `Unknown action: "${action}". Use "fetch_captcha", "submit_verification", or "scrape_details".`,
                     },
                     400
                 );
