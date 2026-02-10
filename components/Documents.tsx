@@ -76,6 +76,7 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
     const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const isProcessingRef = useRef(false);
 
     useEffect(() => {
         const handleOnline = () => setIsOffline(false);
@@ -104,6 +105,30 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
     const base64ToBlob = async (base64: string): Promise<Blob> => {
         const res = await fetch(base64);
         return await res.blob();
+    };
+
+    // Helper: Compress image via canvas — max 1200px, JPEG quality 0.7
+    const compressImage = (base64: string): Promise<string> => {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                const MAX_DIM = 1200;
+                let w = img.width;
+                let h = img.height;
+                if (w > MAX_DIM || h > MAX_DIM) {
+                    if (w > h) { h = Math.round((h / w) * MAX_DIM); w = MAX_DIM; }
+                    else { w = Math.round((w / h) * MAX_DIM); h = MAX_DIM; }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d')!;
+                ctx.drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL('image/jpeg', 0.7));
+            };
+            img.onerror = () => resolve(base64); // Fallback to original on error
+            img.src = base64;
+        });
     };
 
     const getCategoryIcon = (category: string) => {
@@ -201,7 +226,7 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
         };
     }, [isCameraOpen, facingMode]);
 
-    const capturePhoto = () => {
+    const capturePhoto = async () => {
         if (videoRef.current && canvasRef.current) {
             const video = videoRef.current;
             const canvas = canvasRef.current;
@@ -214,11 +239,12 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
                     ctx.scale(-1, 1);
                 }
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                const rawDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                const compressed = await compressImage(rawDataUrl);
                 const fileName = `Captured_Photo_${Date.now()}.jpg`;
                 setUploadQueue(prev => [...prev, {
                     id: Date.now().toString(),
-                    fileUrl: dataUrl,
+                    fileUrl: compressed,
                     fileName: fileName
                 }]);
                 setIsCameraOpen(false);
@@ -233,8 +259,11 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
             let processedCount = 0;
             files.forEach(file => {
                 const reader = new FileReader();
-                reader.onloadend = () => {
-                    const base64 = reader.result as string;
+                reader.onloadend = async () => {
+                    const rawBase64 = reader.result as string;
+                    // Compress images (skip PDFs)
+                    const isPdf = file.type === 'application/pdf';
+                    const base64 = isPdf ? rawBase64 : await compressImage(rawBase64);
                     newQueueItems.push({
                         id: Math.random().toString(36).substr(2, 9),
                         fileUrl: base64,
@@ -309,6 +338,10 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
     };
 
     const processImage = async (base64: string, fileName: string) => {
+        // Guard: prevent duplicate scans from useEffect re-triggers
+        if (isProcessingRef.current) return;
+        isProcessingRef.current = true;
+
         setIsScanning(true);
         setDuplicateWarning(null);
         setFormData({ title: fileName, documentNumber: '', expiryDate: '', category: DocumentCategory.OTHER });
@@ -353,10 +386,11 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
                     category: finalCategory
                 });
                 setIsScanning(false);
-                setIsScanning(false);
+                isProcessingRef.current = false;
             } catch (error: any) {
                 console.error("Scanning Error:", error);
                 setIsScanning(false);
+                isProcessingRef.current = false;
                 // Alert on ALL errors to help debugging
                 alert("Document Scan Failed: " + (error.message || "Unknown error"));
             }
