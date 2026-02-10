@@ -118,6 +118,46 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // INACTIVITY LOGOUT LOGIC
+  useEffect(() => {
+    if (!currentUser) return; // Only track if logged in
+
+    const TIMEOUT_DURATION = 10 * 60 * 1000; // 10 Minutes
+    let logoutTimer: NodeJS.Timeout;
+
+    const resetTimer = () => {
+      if (logoutTimer) clearTimeout(logoutTimer);
+      logoutTimer = setTimeout(() => {
+        // Double check user presence to avoid race
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session) {
+            handleLogout();
+            alert("Session expired due to inactivity. You have been logged out.");
+          }
+        });
+      }, TIMEOUT_DURATION);
+    };
+
+    // Events to track user activity
+    const events = ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart'];
+
+    // Attach listeners
+    events.forEach(event => {
+      window.addEventListener(event, resetTimer);
+    });
+
+    // Initial start
+    resetTimer();
+
+    // Cleanup
+    return () => {
+      if (logoutTimer) clearTimeout(logoutTimer);
+      events.forEach(event => {
+        window.removeEventListener(event, resetTimer);
+      });
+    };
+  }, [currentUser]); // Re-run when user logs in/out
+
   const fetchUserProfile = async (userId: string, email: string) => {
     try {
       const { data, error } = await supabase

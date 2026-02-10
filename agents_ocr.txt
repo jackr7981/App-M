@@ -1,157 +1,12 @@
--- ==============================================================================
--- BD MARINER HUB - COMPLETE BACKEND RESET & SETUP
--- WARNING: This script drops existing tables 'profiles' and 'documents'.
--- Run this in the Supabase SQL Editor.
--- ==============================================================================
-
--- 1. CLEANUP (Start Fresh)
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-DROP FUNCTION IF EXISTS public.handle_new_user();
-DROP TABLE IF EXISTS public.documents;
-DROP TABLE IF EXISTS public.profiles;
-
--- 2. CREATE PROFILES TABLE
-CREATE TABLE public.profiles (
-  id uuid REFERENCES auth.users ON DELETE CASCADE NOT NULL PRIMARY KEY,
-  email text,
-  first_name text,
-  last_name text,
-  department text,
-  rank text,
-  cdc_number text,
-  mobile_number text,
-  date_of_birth date,
-  profile_picture_url text,
-  sea_service_history jsonb DEFAULT '[]'::jsonb,
-  preferred_ship_type text,
-  is_open_for_work boolean DEFAULT false,
-  is_onboard boolean DEFAULT false,
-  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
-  updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 3. CREATE DOCUMENTS TABLE
-CREATE TABLE public.documents (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id uuid REFERENCES auth.users ON DELETE CASCADE NOT NULL,
-  title text NOT NULL,
-  category text,
-  document_number text,
-  expiry_date date,
-  file_path text NOT NULL,
-  page_paths text[],
-  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 4. ENABLE RLS (Security)
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
-
--- 5. AUTOMATIC PROFILE CREATION TRIGGER
--- This fixes the issue where a user signs up but has no profile row to update
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger AS $$
-BEGIN
-  INSERT INTO public.profiles (id, email)
-  VALUES (new.id, new.email);
-  RETURN new;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
-
--- 6. POLICIES (Access Rights)
-
--- Profiles
-CREATE POLICY "Public profiles are viewable by everyone" 
-  ON public.profiles FOR SELECT USING (true);
-
-CREATE POLICY "Users can update own profile" 
-  ON public.profiles FOR UPDATE USING (auth.uid() = id);
-
-CREATE POLICY "Users can insert own profile" 
-  ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
-
--- Documents
-CREATE POLICY "Users can view own documents" 
-  ON public.documents FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can insert own documents" 
-  ON public.documents FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update own documents" 
-  ON public.documents FOR UPDATE USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete own documents" 
-  ON public.documents FOR DELETE USING (auth.uid() = user_id);
-
--- 7. STORAGE SETUP
--- We try to insert buckets, if they exist we catch the error silently or just ensure policies
-INSERT INTO storage.buckets (id, name, public) VALUES ('avatars', 'avatars', true) ON CONFLICT (id) DO NOTHING;
-INSERT INTO storage.buckets (id, name, public) VALUES ('documents', 'documents', true) ON CONFLICT (id) DO NOTHING;
-
--- Storage Policies (Drop first to avoid duplicates if re-running)
-DROP POLICY IF EXISTS "Avatar images are publicly accessible" ON storage.objects;
-DROP POLICY IF EXISTS "Anyone can upload an avatar" ON storage.objects;
-DROP POLICY IF EXISTS "Users can update own avatar" ON storage.objects;
-DROP POLICY IF EXISTS "Documents are accessible by owner" ON storage.objects;
-DROP POLICY IF EXISTS "Users can upload documents" ON storage.objects;
-DROP POLICY IF EXISTS "Users can update own documents" ON storage.objects;
-DROP POLICY IF EXISTS "Users can delete own documents" ON storage.objects;
-
--- Recreate Storage Policies
-CREATE POLICY "Avatar images are publicly accessible" ON storage.objects FOR SELECT USING ( bucket_id = 'avatars' );
-CREATE POLICY "Anyone can upload an avatar" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'avatars' AND auth.role() = 'authenticated' );
-CREATE POLICY "Users can update own avatar" ON storage.objects FOR UPDATE USING ( bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1] );
-
-CREATE POLICY "Documents are accessible by owner" ON storage.objects FOR SELECT USING ( bucket_id = 'documents' AND auth.uid()::text = (storage.foldername(name))[1] );
-CREATE POLICY "Users can upload documents" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'documents' AND auth.uid()::text = (storage.foldername(name))[1] );
-CREATE POLICY "Users can update own documents" ON storage.objects FOR UPDATE USING ( bucket_id = 'documents' AND auth.uid()::text = (storage.foldername(name))[1] );
-CREATE POLICY "Users can delete own documents" ON storage.objects FOR DELETE USING ( bucket_id = 'documents' AND auth.uid()::text = (storage.foldername(name))[1] );
-
--- 8. GRANT PERMISSIONS (Fixes 'permission denied' API errors)
-GRANT ALL ON TABLE public.profiles TO anon, authenticated, service_role;
-GRANT ALL ON TABLE public.documents TO anon, authenticated, service_role;
-
--- 9. RPC FUNCTIONS
--- increments the usage minutes for a user
-create or replace function increment_usage_minutes(x int, user_id uuid)
-returns void
-language plpgsql
-security definer
-as $$
-begin
-  update profiles
-  set total_usage_minutes = coalesce(total_usage_minutes, 0) + x
-  where id = user_id;
-end;
-$$;
-
--- Create agencies table
-CREATE TABLE IF NOT EXISTS public.manning_agents (
-    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-    license_number text NOT NULL,
-    company_name text NOT NULL,
-    address text,
-    contact_details text,
-    owner_name text,
-    validity_date text,
-    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- Enable RLS
-ALTER TABLE public.manning_agents ENABLE ROW LEVEL SECURITY;
-
--- Allow public read access
-CREATE POLICY "Allow public read access" ON public.manning_agents FOR SELECT USING (true);
-
--- Clear existing data (optional, maybe we want to upsert)
-TRUNCATE TABLE public.manning_agents;
-
-INSERT INTO public.manning_agents (license_number, company_name, contact_details, validity_date) VALUES
-('MLA-002', 'Unicorn Shipping Services Limited', 'Unicorn Shipping Services Limited
+==Start of OCR for page 1==
+APPROVED SEAMEN RECRUITING AGENTS
+Content: Pages
+License
+No
+Name of the Company and Address Owner's Name Validity
+MLA -
+002
+Unicorn Shipping Services Limited
 Address: Finlay House (4th Floor), 11 Agrabad, C/A, Chattogram
 Tel : +88 031 712483 Fax : +88 031 713983
 Email: unicornchittagong@unicornship.com
@@ -159,24 +14,30 @@ Web: www.unicornship.com
 Capt. A.T.M
 Anwarul Haque
 26 May
-2026', ''),
-('MLA-003', 'Reliance Shipping Services', 'Reliance Shipping Services
+2026
+MLA -
+003
+Reliance Shipping Services
 Nur Chamber, (3rd Floor) 34,
 Agrabad Commercial Area,
 Chattogram-4100.
 Mohammed
 Abul Khair
 29-05-
-2026', ''),
-('MLA-004', 'Universal Shipping Services', 'Universal Shipping Services
+2026
+MLA -
+004
+Universal Shipping Services
 Room No-13, (6th Floor) 3/D, Kawran Bazar Road, Kabyaks
 super market, Dhaka.
 Phone: 01715331535, Tel: 8809611656255
 E-mail:kak.uss.bd@gmail.com, rhs.uss.bd@gmail.com
 Web: www.universalbd.org
 K.A.Kabir 28 May
-2026', ''),
-('MLA-008', 'Haque & Sons Ltd.', 'Haque & Sons Ltd.
+2026
+MLA -
+008
+Haque & Sons Ltd.
 Rummana Haque Tower 1267/A,
 Goshail Danga, Agrabad, Chattogram.
 Tel : 031-716214-6, 710266, Fax : 031-710530, 710288
@@ -187,8 +48,10 @@ Chowdhury.
 Managing
 Director
 28-05-
-2026', ''),
-('MLA-009', 'JF (Bangladesh) Limited', 'JF (Bangladesh) Limited
+2026
+MLA -
+009
+JF (Bangladesh) Limited
 Address: Finlay House, 11- Agrabad
 C/A, Chattogram. 
 Ahamed
@@ -196,11 +59,13 @@ Quamrul Islam
 Chowdhury
 28 June
 2026
-
-
+==End of OCR for page 1==
+==Start of OCR for page 2==
 Tel : 031-716321-5Fax : 031-710006, 710207
-E-mail: jfbdltd@bdmail.net', ''),
-('MLA-011', 'Marine (Agency) Services Ltd.', 'Marine (Agency) Services Ltd.
+E-mail: jfbdltd@bdmail.net
+MLA -
+011
+Marine (Agency) Services Ltd.
 House No- 1 (4th Floor)Lane-5, Block -1, Road-1
 Halishar Housing estate P.O- Rampur, Chattogram.
 Tel : +88 031 727577, Phone: 017 30047450,
@@ -208,8 +73,10 @@ Fax : +88 031 727576
 E-mail:operation@masbd.info
 Web:www.masgroupbd.com
 27-06-
-2026', ''),
-('MLA-013', 'Sigma Shipping Lines', 'Sigma Shipping Lines
+2026
+MLA -
+013
+Sigma Shipping Lines
 House # 5C, Zakir Hossain Road,
 Pahartali, Khulshi, Chattogram.
 Tel : 031-711317 Fax : 031-2520536
@@ -217,8 +84,10 @@ E-mail: sigmaship@colbd.com
 SK. Mohd.
 Rafiqul Islam
 17-06-
-2026', ''),
-('MLA-014', 'Printik Marine Services Limited', 'Printik Marine Services Limited
+2026
+MLA -
+014
+Printik Marine Services Limited
 Akhtaruzzaman Centre (7th floor),
 21/22 Agrabad Commercial Area,
 Chittagong-4100
@@ -230,8 +99,10 @@ Golam Sarwar
 Managing
 Director
 08-07-
-2024', ''),
-('MLA-022', 'Bay Shipping Services', 'Bay Shipping Services
+2024
+MLA -
+022
+Bay Shipping Services
 The Heaven(5th Floor), 1335/A, Nikunja R/A,
 South Khulshi, Chattogram-4202.
 Tel : -88-031-2513879, Phone: 01833363448,
@@ -240,10 +111,12 @@ E-mail: crew@bayshipping.net
 Md. Azadur
 Rahman
 12.08.2027
-
-
-Web: www.bayshipping.net', ''),
-('MLA-023', 'International Marine Services', 'International Marine Services
+==End of OCR for page 2==
+==Start of OCR for page 3==
+Web: www.bayshipping.net
+MLA -
+023
+International Marine Services
 House No. 317, Road No. 14 CDA
 Agrabad, Chattogram.
 Phone : 01715-024167,01718227411 Fax : 031-816895,
@@ -252,8 +125,10 @@ E-mail:iimt@techno-bd.net.
 Capt. Jafar
 Ahmed
 10-09-
-2027', ''),
-('MLA-024', 'PIL (Bangladesh) Ltd.', 'PIL (Bangladesh) Ltd.
+2027
+MLA -
+024
+PIL (Bangladesh) Ltd.
 IIUC Tower (5th Floor),Plot # 09,
 Sk. Mujib Road, Agrabad C/A Chattogram.
 Tel : 031-713301-6, 727791, Fax : 031-710301
@@ -262,14 +137,18 @@ Mr. Saber
 Hossain
 Chowdhury
 19-10-
-2027', ''),
-('MLA-025', 'KSF Shipping Services', 'KSF Shipping Services
+2027
+MLA -
+025
+KSF Shipping Services
 House # 131(3rd floor), Road # 17 CDA R/A,
 Agrabad, Chattogram.
 Tel : 031-711023, 711737 Fax : 031-710756
 A.K.M. Faisal 12-05-
-2026', ''),
-('MLA-026', 'NYK Line (Bangladesh) Ltd.', 'NYK Line (Bangladesh) Ltd.
+2026
+MLA -
+026
+NYK Line (Bangladesh) Ltd.
 Land View Commercial Center(14th Floor) 28,
 Gulshan North C/a,Culshan Circle-2, Dhaka-1212,
 Tel: +88 02 8852703, Fax: +88 02 8852705
@@ -278,9 +157,11 @@ A.Z.M Tariqual
 Islam
 09-05-
 2026
-
-', ''),
-('MLA-028', 'Bluestar Services Limited.', 'Bluestar Services Limited.
+==End of OCR for page 3==
+==Start of OCR for page 4==
+MLA -
+028
+Bluestar Services Limited.
 Bluestar House, House #12, Road#09, Block-J,
 Baridhara (Progati Sarani Road) Dhaka-1212
 Phone: +880-1819217093, Tel: +88-02-58814973
@@ -292,8 +173,10 @@ Taneem Hasan
 Managing
 Director
 23-03-
-2026', ''),
-('MLA-030', 'Ever Cheer Marine Services', 'Ever Cheer Marine Services
+2026
+MLA -
+030
+Ever Cheer Marine Services
 Suit No. 703(6th Floor), South Land Centre 05,
 Agrabad C/A. Chattogram-4100
 Tel : +88-02333319485, +88-02333319487
@@ -305,8 +188,10 @@ Abbas Uddin
 (Managing
 Director)
 20-04-
-2023', ''),
-('MLA-035', 'Shoreline ServicesLimited', 'Shoreline ServicesLimited
+2023
+MLA -
+035
+Shoreline ServicesLimited
 Delower Bhaban(4th Floor),
 104 Agrabad C/A, Chattogram-4100
 Tel : +88-02-333322814-15, Fax : +88-02-3333 11268
@@ -317,16 +202,20 @@ Hussain Tutul
 Managing
 Director
 21-11-
-2026', ''),
-('MLA-036', 'S.K. Engineering', 'S.K. Engineering
+2026
+MLA -
+036
+S.K. Engineering
 House no.1159/1, Shahapur, Jamalpur
 Tel: +88 01715032862
 E-mail: info@slengineering.info
 Md. Abdul
 Mannan
 15-04-
-2025', ''),
-('MLA-040', 'Asia Marine Agency', 'Asia Marine Agency
+2025
+MLA -
+040
+Asia Marine Agency
 Al-Razi Complex (7th Floor) Suit # D-701,
 166-167, Shaheed Syed Nazrul Islam Sarani, Purana Paltan,
 Dhaka-1000
@@ -335,10 +224,12 @@ Md. Reaz
 Rahman
 10-10-
 2027
-
-
-E-mail:infoama@asiatelnet.com', ''),
-('MLA-044', 'B.N.F. Shipping Services', 'B.N.F. Shipping Services
+==End of OCR for page 4==
+==Start of OCR for page 5==
+E-mail:infoama@asiatelnet.com
+MLA -
+044
+B.N.F. Shipping Services
 Skay Lark point, Suit No-G2(6th floor),
 24/A Bijoy nager, Dhaka
 Tel: 9342987, Fax: 9350127
@@ -346,8 +237,10 @@ E-mail:bnfshipping@gmail.com
 Habib Mohd.
 Saifullah
 27-06-
-2026', ''),
-('MLA-047', 'Aquamarine Bangladesh Ltd.', 'Aquamarine Bangladesh Ltd.
+2026
+MLA -
+047
+Aquamarine Bangladesh Ltd.
 Comfort Niketon, House-77, Flat-2B, Road-4, Block-B,
 Niketan, Gulshan-1, Dhaka-1212.
 Tel.- +880-2-9840591-93, Phone. 0178 6434 642.
@@ -356,8 +249,10 @@ web: www.aquamarinebd.com
 Managing
 Director
 15-08-
-2024', ''),
-('MLA-051', 'Mercantile Shipping Lines Ltd.', 'Mercantile Shipping Lines Ltd.
+2024
+MLA -
+051
+Mercantile Shipping Lines Ltd.
 Fresh Villa, House No-15, Road No-34 Gulshan-1, Dhaka-1212.
 Tel: +88 09666777055, +88-02  9889490, Fax: +88 02  9884896
 E-mail: info@mgi.org
@@ -366,8 +261,10 @@ Mostafa Kamal
 Managing
 Director
 13-02-
-2027', ''),
-('MLA-060', 'Brave Royal Ship Management (BD) Limited', 'Brave Royal Ship Management (BD) Limited
+2027
+MLA -
+060
+Brave Royal Ship Management (BD) Limited
 Address: Kabir Manzil (4th Floor) Sheikh Mojib Road,
 Agrabad C/A. Chattogram-4100
 Pho-031-2510457, 2514780, Fax-031-2510458
@@ -377,8 +274,10 @@ Shahjahan
 Managing
 Director
 30 March
-2027', ''),
-('MLA-061', 'Vanguard Maritime Limited', 'Vanguard Maritime Limited
+2027
+MLA -
+061
+Vanguard Maritime Limited
 Afrif Chamber, 98-Agrabad C/A, Chattogram
 Tel: +88 031 2510457 Fax-+88 031 2510458
 E-mail-info@vmlbd.com
@@ -386,9 +285,11 @@ Nafid Nabi
 Director
 30-03-
 2027
-
-', ''),
-('MLA-063', 'Sea Gold Shipping Services', 'Sea Gold Shipping Services
+==End of OCR for page 5==
+==Start of OCR for page 6==
+MLA -
+063
+Sea Gold Shipping Services
 House No.-13(Ground Floor),
 Road No.-3, Lane No.-5, Block-K, Halishahar, Chattogram
 Ph. No.: +880-31-717132, Phone No. +880-1827566485
@@ -399,8 +300,10 @@ Latif
 Managing
 Director
 06-03-
-2026', ''),
-('MLA-065', 'East Coast Shipping Lines Ltd', 'East Coast Shipping Lines Ltd
+2026
+MLA -
+065
+East Coast Shipping Lines Ltd
 East Coast House,  138/A  CDA R/A, Road No. 01, Agrabad,
 Chittagong.
 Ph. No. : +880-31-710010, +880-31-713266, Phone No.:+88-
@@ -411,8 +314,10 @@ Azam J.
 Chowdhury     
 Chairman
 04-03-
-2024', ''),
-('MLA-067', 'Mariners Bangladesh Services Ltd.', 'Mariners Bangladesh Services Ltd.
+2024
+MLA -
+067
+Mariners Bangladesh Services Ltd.
 Permanent Address: Vill-Bishnupur, Post-Mayura, Ps-Nangolkot,
 Dist-Comilla.
 Present Address: A R Tower, (Ground Floor), Rahamanbag,
@@ -426,16 +331,20 @@ Mozumder
 (Managing
 Director)
 05-03-
-2026', ''),
-('MLA-070', 'Sea King Marine Services Limited', 'Sea King Marine Services Limited
+2026
+MLA -
+070
+Sea King Marine Services Limited
 10th Floor, Aktharuzzaman Center 21/22 Agrabad C/A,
 Chattogram
 Tel: +88 031-717253 Tel:+88-01844177255
 E-mail: operation@skmsbd.com
 Web : www.skmsbd.com
 Anisur Rahman 17-06-
-2026', ''),
-('MLA-071', 'Unicorn Marine Ltd.', 'Unicorn Marine Ltd.
+2026
+MLA -
+071
+Unicorn Marine Ltd.
 Sadharan Bima Sadan (2nd floor), 102, Agrabad C/A, Chittagong.
 Tel: 031-727465 Fax: 031-713983
 E-mail: marine@unicornship.com
@@ -444,9 +353,11 @@ Capt. Syed
 Amir Ahmed
 06-11-
 2027
-
-', ''),
-('MLA-073', 'Naaf Marine Services', 'Naaf Marine Services
+==End of OCR for page 6==
+==Start of OCR for page 7==
+MLA -
+073
+Naaf Marine Services
 Portland Sattar Tower (5th Floor) 1776 Strand Road,
 East of Barik Building, Agrabad, Chattogram
 Tel: 031-717308-09, 2518660, Fax: 031-716101
@@ -455,8 +366,10 @@ Capt. Md.
 Salah Uddin
 Chowdhury
 09-09-
-2026', ''),
-('MLA-075', 'GSP Marine Services', 'GSP Marine Services
+2026
+MLA -
+075
+GSP Marine Services
 Meem Tower, House: 33 (2nd Floor), Road: 03, O.R. Nizam
 Road,
 East Nasirabad, Chattogram.
@@ -465,8 +378,10 @@ Capt. Rashidul
 Hasan
 Chowdhury
 09-09-
-2026', ''),
-('MLA-076', 'Fazila Marine', 'Fazila Marine
+2026
+MLA -
+076
+Fazila Marine
 House No.39, Road-07, Sector-12, Uttara, Dhaka-1230
 Tel : +88 02 55085439, Fax: +88 02 55085439
 Email : fazilamarine@yahoo.com,  info@fazilamarine.com
@@ -474,8 +389,10 @@ Web:  www.fazilamarine.com
 Md. Jahangir
 Hosain
 10-09-
-2026', ''),
-('MLA-077', 'Shah Shipping Recruiting Agency', 'Shah Shipping Recruiting Agency
+2026
+MLA -
+077
+Shah Shipping Recruiting Agency
 Address: Vill: Bokchar, Union: Jamirta, P.S: Singair, Dist:
 Manikganj
 Present: House-36, Road-3, Block A, PC Culture Housing,
@@ -487,9 +404,11 @@ Shah Mominul
 Islam
 19 August
 2026
-
-', ''),
-('MLA-080', 'A. Z. SHIPPING SERVICES', 'A. Z. SHIPPING SERVICES
+==End of OCR for page 7==
+==Start of OCR for page 8==
+MLA -
+080
+A. Z. SHIPPING SERVICES
 Silver Castle, Bepari Para, Mosque-CDA by Lane, Agrabad,
 Chattogram
 Tel : 031-2524486, 031-2528581, 031-2520086(Res)
@@ -498,8 +417,10 @@ E-mail: gaffarazshipping@gmail.com
 Md.Abdul
 Gaffar
 10-04-
-2027', ''),
-('MLA-081', 'Seafarers Placement Services', 'Seafarers Placement Services
+2027
+MLA -
+081
+Seafarers Placement Services
 House-X61/1, Road-3, Block-A, Chandgoa R/A, Chittagong.
 & House-1, Road-1, Lane-5, Block-L, Halishahar Housing
 Estate, Chattogram.
@@ -508,8 +429,10 @@ Email: seafarersplacementservices@gmail.com
 Mrs. Shaheda
 Kasem
 03-08-
-2027', ''),
-('MLA-082', 'JAR World Marine (Pvt) Limited', 'JAR World Marine (Pvt) Limited
+2027
+MLA -
+082
+JAR World Marine (Pvt) Limited
 Anayat Ali Member`s House, Middle Halishahar Monsipara,
 P.O-Ananda Bazar, P.S. Bandar, Chittagong.
 & Milinium Plaza (4th Floor), 2905, Agrabad Ex.
@@ -517,8 +440,10 @@ Road, Chattogram.
 Tel: +88 031 2530011, Fax: +88 031 2514088
 E-mail: shipmanning@jarship.com, jar@jargroup.biz
 MD. Jinnat Ali 03-08-
-2027', ''),
-('MLA-083', 'Atlantic Shipping Services', 'Atlantic Shipping Services
+2027
+MLA -
+083
+Atlantic Shipping Services
 House # 02, Road # 11, Block # F, Banani, Dhaka-1213
 Tel. No: +880 2 9870536,9870885-6, Fax No: +880 2 9870536
 Phone No: 880 1938444888, 01938444777
@@ -527,8 +452,10 @@ Web: www.atlssmg.com
 Md. Tawrat Ali,
 Chairman
 19-12-
-2025', ''),
-('MLA-085', 'Golden Carrier Ship Management', 'Golden Carrier Ship Management
+2025
+MLA -
+085
+Golden Carrier Ship Management
 Tulatoli Road, Faujdarhat, Chittagong.
 &  House # 10 (3rd Floor), Road # 31, Sector # 7,
 Uttara, Dhaka-1230.
@@ -536,11 +463,13 @@ Maruf Md.
 Jahirul Islam
 20-12-
 2025
-
-
+==End of OCR for page 8==
+==Start of OCR for page 9==
 Tel : 880-31-2781238-9Fax: 880-31-2781240
-E-mail : maruf_engr77@yahoo.com', ''),
-('MLA-088', 'S.S. Marine Service', 'S.S. Marine Service
+E-mail : maruf_engr77@yahoo.com
+MLA -
+088
+S.S. Marine Service
 House # 61, Road # 1, Bashundhara R/A, Dhaka-1230
 Tel : 880-2-8401774, Fax: 880-2-8401774, Phoneil- +88
 01841047450
@@ -549,8 +478,10 @@ Md. Nazmul
 Haque
 Propitor 
 19-07-
-2026', ''),
-('MLA-089', 'ASP Crew Management Limited', 'ASP Crew Management Limited
+2026
+MLA -
+089
+ASP Crew Management Limited
 House: 467(1 Floor), Road :31, Mohakhali DOHS, Dhaka-1206.
 Tel: +88 02 9884312-7, +88 01711475995 Fax: +88 02
 9883783/85
@@ -559,8 +490,10 @@ ASP Crew
 Management
 Limited
 11-05-
-2026', ''),
-('MLA-092', 'Expert Associate Limited', 'Expert Associate Limited
+2026
+MLA -
+092
+Expert Associate Limited
 House No: 5, Road # 3, Sector # 7, Uttara, Dhaka-1236
 Tel: 880-27553573,Fax: 880 27553573 Cell: 01790356530
 E-mail: info@expertassociate.biz, crewing@expertassociate.biz
@@ -568,8 +501,10 @@ Web : www.expertassociate.biz
 S M Sirajul
 Azad
 License
-suspended', ''),
-('MLA-094', 'R.B.M Maritime Limited', 'R.B.M Maritime Limited
+suspended
+MLA -
+094
+R.B.M Maritime Limited
 506, Omar Shajahan Tower (3rd Floor), Shah Kabir Mazar Road,
 Azampur Railgate, Uttara, Dhaka-1230.
 Tel. No.: +88-031-2515361,2511529
@@ -577,9 +512,11 @@ E-mail: info@rbmgroupbd.net.net.
 Web : www.rbmgroupbd.net
 Fazle Elahi 23-06-
 2027
-
-', ''),
-('MLA-096', 'Ayar Shipping Services', 'Ayar Shipping Services
+==End of OCR for page 9==
+==Start of OCR for page 10==
+MLA -
+096
+Ayar Shipping Services
 Kh Tower, (5th Floor), Plot # 10, Lane # 05, Road # 01,
 Block # L, Arabad Access Road, Halishahar,Boropool,
 Chattogram
@@ -588,8 +525,10 @@ E-mail: info@ayarship.com.
 Capt. Syed
 Imam Hossain
 20-06-
-2027', ''),
-('MLA-097', 'South Asia Ship Crewing Agent', 'South Asia Ship Crewing Agent
+2027
+MLA -
+097
+South Asia Ship Crewing Agent
 Metro Plaza (4th Floor), 79/A- Sadarghat Road,
 Room No- 501, Opposite Kali Bari, Chittagong.
 Tel: 88-031-2853773, Fax: 88-031-2853774
@@ -598,8 +537,10 @@ Md. Kazi
 Nazim Uddin
 Proprietor
 28-03-
-2026', ''),
-('MLA-098', 'Marine Hive Ltd.', 'Marine Hive Ltd.
+2026
+MLA -
+098
+Marine Hive Ltd.
 25, Gorib-e-Newaz Avenue, Flat-A2 Sector#11,
 Uttara Model Town Dhaka-1230
 Ph:- +88 02 7913662
@@ -608,30 +549,38 @@ Web: www.marinehive.com
 Omar Sharif
 Arefeen
 23-03-
-2026', ''),
-('MLA-099', 'Dolphin Maritime Services Limited', 'Dolphin Maritime Services Limited
+2026
+MLA -
+099
+Dolphin Maritime Services Limited
 Nishorgo (Ground Floor), House no-1, Road no-A/1,
 Karnafuly R/A, Halishahar, Chittagong, Bangladesh.
 S.M.A.Hannan 24-03-
-2026', ''),
-('MLA-101', 'Zebra Shipping Limited', 'Zebra Shipping Limited
+2026
+MLA -
+101
+Zebra Shipping Limited
 15, Strand Road, Majhirghat, Chattogram-4000
 Tel: 088031-618940,618975, Fax:088031-610067
 Email: zebrashippingbd@gmail.com
 Abdulla
 IFekhar Chisty
 Approval
-Expired', ''),
-('MLA-102', 'Sailor Bangladeah Limited', 'Sailor Bangladeah Limited
+Expired
+MLA -
+102
+Sailor Bangladeah Limited
 Suite no-1A,(1st floor), Entaj Ali Pradaise, 43/1/7,
 Atish Diponkar Road, Sabuj Kanon, Basabo, Dhaka-1000
 Md. Zafor
 Sadik
 13-03-
 2027
-
-', ''),
-('MLA-103', 'Shobuj Bangla Shipping Service Limited', 'Shobuj Bangla Shipping Service Limited
+==End of OCR for page 10==
+==Start of OCR for page 11==
+MLA -
+103
+Shobuj Bangla Shipping Service Limited
 House No : 13, Road No : 02, Lane No : 03 Block-K,
 Halishahar, Chattogram-4216
 Tel.No : +88-031-2527891, Phoneil. No. +880-1869579796
@@ -641,8 +590,10 @@ crew@shbss.com.bd, info@shbss.com.bd, crew.shbss@gmail.com
 Mrs. Tuhina
 Akter
 19-09-
-2027', ''),
-('MLA-104', 'Marine Fleet Shipping Limited', 'Marine Fleet Shipping Limited
+2027
+MLA -
+104
+Marine Fleet Shipping Limited
 74(1st Floor), Road No.-27, C.D.A R/A, Agrabad, Chittagong 4100
 Tel: 880-31-714741, 2528631, Fax: 880-31-710025
 E-mail: marinefleetbd@gmail.com, info@marinefleetbd.com,
@@ -652,8 +603,10 @@ Hossain,
 Managing
 Director
 25-09-
-2027', ''),
-('MLA-105', 'Global Ocean Shipping Services Ltd.', 'Global Ocean Shipping Services Ltd.
+2027
+MLA -
+105
+Global Ocean Shipping Services Ltd.
 Flat No. B/2, House No.13, Road No.11, Sector No. 11,
 Uttara Model Town, Dhaka-1230 
 Bangladesh. Phone: 01781666777, 01672698555,
@@ -664,16 +617,20 @@ Kazi Abdul
 Wadood Miah
 Chairman
 15-04-
-2026', ''),
-('MLA-106', 'Unipole Shipping Services', 'Unipole Shipping Services
+2026
+MLA -
+106
+Unipole Shipping Services
 Present Address: Chairman Center(2nd Floor),
 House No-1, Road No.-2, Lane No-3, Gate No-9,
 Block-K Halishahar H/E, P.C Road, Chittagong
 Tel: 88-031-715614, Fax: 88-031-715614 
 E-mail: crewing@unipoleshipping.com
 Abdul Mannan 16 April
-2026', ''),
-('MLA-107', 'Good Luck Maritime Ltd.', 'Good Luck Maritime Ltd.
+2026
+MLA -
+107
+Good Luck Maritime Ltd.
 201, K.Y Tower, Gulbag, Agrabad Access Road,
 Agarbad, Chattogram.
 Mohabbat Ali
@@ -681,29 +638,35 @@ Siddique Apon
 Chowdhury
 15-04-
 2026
-
-
+==End of OCR for page 11==
+==Start of OCR for page 12==
 Tel: +88 02333318388, Phone: +88 01756022448,
 Email: info@goodluckmaritime.com, gdlm.crewing@gmail.com
 Web: www.goodluckmaritime.com
-Chairman', ''),
-('MLA-108', 'Compass  Shipping Service Ltd.', 'Compass  Shipping Service Ltd.
+Chairman
+MLA -
+108
+Compass  Shipping Service Ltd.
 Sultan Hajer Bari, Kusumpura, Kalarpool, Patiya,Chattogram.
 Md. Atikur
 Rahman
 Managing
 Director
 09-12-
-2026', ''),
-('MLA-109', 'Elite Maritime Ltd.', 'Elite Maritime Ltd.
+2026
+MLA -
+109
+Elite Maritime Ltd.
 1557, Hazipara Singapore Market, Romm: 612, 5th floor,
 Agrabad  Access Road, Chattogram.
 Habibur
 Rahman
 Chairman
 11-12-
-2022', ''),
-('MLA-110', 'NSP Shipping Services Ltd.', 'NSP Shipping Services Ltd.
+2022
+MLA -
+110
+NSP Shipping Services Ltd.
 Permanent Address: 349, North Shahjahan Pur,
 P.O: Shantinagor, Thana: Shahjahan Pur, District: Dhaka.
 Ph No.: +88-০2-48322127, 48321925-6, Phone:+880-1777543980
@@ -713,8 +676,10 @@ Muhammad
 Managing
 Director
 12-12-
-2026', ''),
-('MLA-111', 'Sea Express Ltd.', 'Sea Express Ltd.
+2026
+MLA -
+111
+Sea Express Ltd.
 Shahidullah Bahabon, H-01/A (4th Floor), Road-02,
 Lame-03, Block-K, Halishahar H/E, Halishahar, Chittagong
 Phone: +88-0161 0383 868
@@ -724,8 +689,10 @@ Mohammad
 Abdullah
 Chairman
 07-04-
-2027', ''),
-('MLA-112', 'MSM Marine & Shipping Services', 'MSM Marine & Shipping Services
+2027
+MLA -
+112
+MSM Marine & Shipping Services
 R.I. Tower (Level 6), 23/A M.M Ali Road, Mehedibag,
 Chattogram-4000
 Ph No.: +88-031-2859929, Phoneil +880-1844470870
@@ -736,9 +703,11 @@ Sultana
 Proprietor
 25-06-
 2027
-
-', ''),
-('MLA-113', 'Falcon Marine Services Ltd', 'Falcon Marine Services Ltd
+==End of OCR for page 12==
+==Start of OCR for page 13==
+MLA -
+113
+Falcon Marine Services Ltd
 Plot #21 (Ground Floor), Road #9/A, Nikunja R/A-1,
 Khilkhet, Dhaka
 Phone: +880-1748 196658, 01712 190562
@@ -751,8 +720,10 @@ Mondal
 Managing
 Director
 28-06-
-2027', ''),
-('MLA-114', 'MariAid Limited', 'MariAid Limited
+2027
+MLA -
+114
+MariAid Limited
 Rahima Concord, House No.-18(4th Floor),
 Road No,-1, Sector No.-5, Uttara Model Town, Dhaka-1230.
 Ph No.: +88-02-48956769, 01712 201060
@@ -763,8 +734,10 @@ Motin
 Managing
 Director
 18-08-
-2027', ''),
-('MLA-116', 'Karnaphuli Maritime Limited', 'Karnaphuli Maritime Limited
+2027
+MLA -
+116
+Karnaphuli Maritime Limited
 HR Bhaban, 26/1 Kakrail, Dhaka- 1000
 Ph.No. +880-2- 58310167-73,Fax  880 -2- 48314948,
 Phone +8801730730525
@@ -775,8 +748,9 @@ Chowdhury
 Managing
 Director
 08-01-
-2028', ''),
-('MLA-117', 'Gemini Maritime Agency Bangladesh', 'Gemini Maritime Agency Bangladesh
+2028
+MLA 117
+Gemini Maritime Agency Bangladesh
 Flat 6B, (7th Floor), House no: 245/1, & 247 South Paikpara,
 Mirpur, Dhaka-1216
 Ph. No. +880-1810020098
@@ -787,9 +761,10 @@ Sazzedeen
 Proprietor
 14-06-
 2026
-
-', ''),
-('MLA-118', 'Forazi Shipping Limited', 'Forazi Shipping Limited
+==End of OCR for page 13==
+==Start of OCR for page 14==
+MLA 118
+Forazi Shipping Limited
 Permanent & Present Address: Finlay House (4th Floor),
 11 Agrabad C/A, Chattogram-4100.
 Ph. No. +880-1629 722 247
@@ -798,8 +773,10 @@ F.M. Tariqul
 Islam
 Chairman
  14 June
-2026', ''),
-('MLA-119', 'Green Ship Services', 'Green Ship Services
+2026
+MLA -
+119
+Green Ship Services
 Castle Queen, 4/B, House No.- 8, Road No.- 2, Lane No.-2,
 Block-G, Halishahar, Chattogram
 Permanent address- Shluk Mura, Bhubanghar,
@@ -810,8 +787,10 @@ Web www.greenshippingservice.comt
 Rakibul Hasan
 Proprietor
  14-06-
-2026', ''),
-('MLA-120', 'Royal Marine Management', 'Royal Marine Management
+2026
+MLA -
+120
+Royal Marine Management
 Permanent & Present Address: Hashem Tower (1st Floor),
 M.A.Aziz Road, South Halishahar, Chittagong-4100
 Phone: 018163-62109
@@ -821,8 +800,10 @@ Mohammed
 Sailm
 Proprietor
 20-12-
-2024', ''),
-('MLA-121', 'K-line Maritime CO. Limited', 'K-line Maritime CO. Limited
+2024
+MLA -
+121
+K-line Maritime CO. Limited
 Akhi Palace, House: 01, Road: 01, Lane: 02, Block: G,
 Boropool, Halishahar, Chattogra.
 Call: +880-01923-459015 TNT: +880-02333324113
@@ -833,9 +814,11 @@ Azizur Rahman
 Chairman
 15-01-
 2027
-
-', ''),
-('MLA-122', 'Ocean Hub Ltd', 'Ocean Hub Ltd
+==End of OCR for page 14==
+==Start of OCR for page 15==
+MLA -
+122
+Ocean Hub Ltd
 F-10, House: 17, Sector: 13, Uttara, Dhaka
 Phone: 02-48956150, Phone: 01880282126
 E-mail: crewing@oceanhubbd.com
@@ -844,8 +827,10 @@ Ghulam
 Quddus Khan
 Chairman
 15-01-
-2027', ''),
-('MLA-123', 'CK Maritime Ltd.', 'CK Maritime Ltd.
+2027
+MLA -
+123
+CK Maritime Ltd.
 Permanent Address: 30/A, Noya Palton, Sattar Tower (10th Floor)
 V.I.P Road, Dhaka-1000
 & Present Address: House-836, Apt-8A, Road-12,
@@ -859,8 +844,10 @@ Rahman Khan
 Managing
 Director
 09-04-
-2027', ''),
-('MLA-124', 'Bluewave Shipping Pvt. Ltd.', 'Bluewave Shipping Pvt. Ltd.
+2027
+MLA -
+124
+Bluewave Shipping Pvt. Ltd.
 Permanent Address: House-50, Garib-E-Newaz Avenue Road,
 Section-13, Uttara-1230, Dhaka.
 Present Address: 522 SK, Mujib Road, 3rd Floor, Choumohoni,
@@ -870,9 +857,11 @@ E-mail:crewing@bluewaveshippingservices.com
 Web: www.bluewaveshippingservices.com
 09-04-
 2027
-
-', ''),
-('MLA-125', 'Aristocarat Merchant Marine Services Limited.', 'Aristocarat Merchant Marine Services Limited.
+==End of OCR for page 15==
+==Start of OCR for page 16==
+MLA -
+125
+Aristocarat Merchant Marine Services Limited.
 Permanent Address: Bismillah Tower, 580/7, North Kafrul, Dhaka
 Cantonment, Dhaka-1206
 Present Address: 501/5, East Kazipara, Kafrul, Mirpur,
@@ -881,8 +870,10 @@ Phone: 01521516198
 E-mail:Crewing@aristocratbd.com
 Web: www.aristocratbd.com
 11-04-
-2027', ''),
-('MLA-126', 'QNS Intermodal Logistic Limited.', 'QNS Intermodal Logistic Limited.
+2027
+MLA -
+126
+QNS Intermodal Logistic Limited.
 Permanent Address: Aziz Court (22th Floor), 88-89,
 Agrabad C/A, Chattogram.
 Present Address: Aziz Court (22th Floor), 88-89,
@@ -891,8 +882,10 @@ Phone: 01897-657619
 E-mail: intermodal@qnscorp.com
 Web: www.qnsglobal.com
 11-04-
-2027', ''),
-('MLA-127', 'Vigilant Shipping Ltd.', 'Vigilant Shipping Ltd.
+2027
+MLA -
+127
+Vigilant Shipping Ltd.
 Permanent Address: Flat No-5B, House No: 10,
 Road: Main Road, Block: K, South Banasree, Khilgaon, Dhaka 1219
 Present Address: Flat No-5B, House No: 10, Road: Main Road,
@@ -906,9 +899,11 @@ Managing
 Director
 22-08-
 2027
-
-', ''),
-('MLA-128', 'Capella Shipping Services.', 'Capella Shipping Services.
+==End of OCR for page 16==
+==Start of OCR for page 17==
+MLA -
+128
+Capella Shipping Services.
 Permanent Address: 10/A, Road-06, Plot-1, Pallabi,
 Mirpur, Dhaka-1216.
 Present Address: 10/A, Road-06, Plot-1, Pallabi,
@@ -922,8 +917,10 @@ Ahmed
 Managing
 Partner
 22-08-
-2025', ''),
-('MLA-130', 'Premier Marine Services.', 'Premier Marine Services.
+2025
+MLA -
+130
+Premier Marine Services.
 Permanent Address: House: 17, (Level-02, Flat-F/4),
 Road: 14, Sector-13, Uttara Model Town, Dhaka-1230.
 Present Address: 17, (Level-02, Flat-F/4), Road: 14,
@@ -934,8 +931,10 @@ Web: www.prmsbd.com
 Tajnina Sultana
 Proprietor
 17-09-
-2025', ''),
-('MLA-131', 'AHP Marine Services', 'AHP Marine Services
+2025
+MLA -
+131
+AHP Marine Services
 Present Address: Road No: 17, House No: 111/B,
 2nd Floor, Agrabad, CDA Residential Area, Port, Chittagong.
 Permanent Address: Mo: Abul Hossain House,
@@ -948,8 +947,10 @@ Gani
 Managing
 Partner
 02 June
-2026', ''),
-('MLA-132', 'NTN Oceanic Pledge Ltd.', 'NTN Oceanic Pledge Ltd.
+2026
+MLA -
+132
+NTN Oceanic Pledge Ltd.
 Permanent Address: Tonmoy Nir, Madhumallar Dangi,
 Khulna Road Mor, Satkhira.
 Present Address: “Isabella Tower” Level-9A (8th Floor),
@@ -964,9 +965,11 @@ Kabeju
 Director)
 02-06-
 2026
-
-', ''),
-('MLA-133', 'Divine Marine Services Bangladesh Ltd.', 'Divine Marine Services Bangladesh Ltd.
+==End of OCR for page 17==
+==Start of OCR for page 18==
+MLA -
+133
+Divine Marine Services Bangladesh Ltd.
 Permanent & Present Address: B-7 (7th Floor), House-75, Road 14, Sector-13, Uttara, Dhaka. 
 Phone: +880241360049, Mobile: +8801974958689
 E-mail: info@dmsbl.com.bd
@@ -976,8 +979,10 @@ Joynul
 Director)
 17
 September
-2026', ''),
-('MLA-134', 'Glory-Wind Shipping Services Pvt. Ltd.', 'Glory-Wind Shipping Services Pvt. Ltd.
+2026
+MLA -
+134
+Glory-Wind Shipping Services Pvt. Ltd.
 Permanent & Present Address: House No-07.
 Road No-07, Block-G, Boropool,
 Halishahar H/E, Chattagram.
@@ -990,8 +995,10 @@ Isdanie
 Director)
 17
 September
-2026', ''),
-('MLA-135', 'Efficient Global Limited', 'Efficient Global Limited
+2026
+MLA -
+135
+Efficient Global Limited
 Permanent & Present Address: House No-101, (3rd Floor left)
 Road No-06,
 Railway Housing Society, Akbarsha, Chattogram.
@@ -1002,8 +1009,10 @@ Taslima Alam
 (Managing
 Director)
 05-10-
-2026', ''),
-('MLA-136', 'Pride Shipping Lines', 'Pride Shipping Lines
+2026
+MLA -
+136
+Pride Shipping Lines
 Permanent & Present  Address: Akhtaruzzaman Centre
 (11th Floor) 21/22, Agrabad C/A, Chattogram.
 Phone: +8801706171343
@@ -1013,8 +1022,10 @@ Proprietor
 Md. Nazrul
 Islam
 12-02-
-2027', ''),
-('MLA-137', 'Tiger Shipping Services', 'Tiger Shipping Services
+2027
+MLA -
+137
+Tiger Shipping Services
 Permanent Address: Vill-Batikamari, P.O: Batikamari, P.S:
 Sarisabari, Dist: Jamalpur.
 Present Address: TGB, MDC BM Port View, Titas Tower (Ground
@@ -1028,8 +1039,10 @@ Bellal Hossain
 (Managing
 Partner)
 23-03-
-2027', ''),
-('MLA-138', 'Eureka Ship Management', 'Eureka Ship Management 
+2027
+MLA -
+138
+Eureka Ship Management 
 Permanent  & Present Address: 23, Captain Shahid Monsur Ali
 Road,
 Syed Md.
@@ -1038,13 +1051,15 @@ Sajid-Ul-Enam
 Partner)
 12-05-
 2027
-
-
+==End of OCR for page 18==
+==Start of OCR for page 19==
 (3rd Floor), Flat:3/A, Ramana, Dhaka-1217
 Phone: +880 1911666828
 Email: sajid.marine@gmail.com
-Web: www.esmbd.com', ''),
-('MLA-139', 'Imperial Shipping Services', 'Imperial Shipping Services
+Web: www.esmbd.com
+MLA -
+139
+Imperial Shipping Services
 Permanent Address: 136/6, Pakuria Road, Beside Uttara Sector 14, Ps-Turag, Dist-Dhaka.
 Present Address: 10/6, Baigartek, Dhaka Cantonment, Pallabi,
 Dhaka.
@@ -1056,8 +1071,9 @@ Saidul Islam
 (Managing
 Director)
 20-05-
-2027', ''),
-('MLA-140', 'Sunrise International Shipping Company', 'Sunrise International Shipping Company
+2027
+MLA 140
+Sunrise International Shipping Company
 Permanent Address: Vill:West khada, P.O: Rayanda, P.S:
 Sarankhola, Dist: Bagerhat 
 Present Address: Flat: 6D, Mamtaj Villa: 10, Plot: 4, Block: F,
@@ -1071,4 +1087,4 @@ Bayas
 (Chairman)
 25-08-
 2027
-', '');
+==End of OCR for page 19==
