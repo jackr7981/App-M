@@ -198,9 +198,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     const filteredUsers = useMemo(() => {
         const lowerQ = searchQuery.toLowerCase();
         return users.filter(u =>
-            u.profile?.firstName.toLowerCase().includes(lowerQ) ||
-            u.profile?.lastName.toLowerCase().includes(lowerQ) ||
-            u.profile?.cdcNumber.toLowerCase().includes(lowerQ)
+            (u.profile?.firstName || '').toLowerCase().includes(lowerQ) ||
+            (u.profile?.lastName || '').toLowerCase().includes(lowerQ) ||
+            (u.profile?.cdcNumber || '').toLowerCase().includes(lowerQ)
         );
     }, [users, searchQuery]);
 
