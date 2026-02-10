@@ -40,6 +40,10 @@ const App: React.FC = () => {
   const [dosCaptcha, setDosCaptcha] = useState('');
   const [dosError, setDosError] = useState<string | null>(null);
   const [dosStep, setDosStep] = useState<'captcha' | 'fetching' | 'success'>('captcha');
+  const [captchaImage, setCaptchaImage] = useState<string | null>(null);
+  const [csrfToken, setCsrfToken] = useState('');
+  const [csrfName, setCsrfName] = useState('_csrf-search');
+  const [sessionCookies, setSessionCookies] = useState('');
 
   useEffect(() => {
     // Network Status Listeners
@@ -480,8 +484,11 @@ const App: React.FC = () => {
     }
   };
 
+  // CDC VERIFY EDGE FUNCTION URL
+  const CDC_VERIFY_URL = 'https://zlgfadgwlwreezwegpkx.supabase.co/functions/v1/cdc-verify';
+
   // DOS IMPORT LOGIC
-  const openDosModal = () => {
+  const openDosModal = async () => {
     if (isOffline) {
       alert("DOS Import requires internet connection.");
       return;
@@ -493,61 +500,105 @@ const App: React.FC = () => {
     setDosStep('captcha');
     setDosCaptcha('');
     setDosError(null);
+    setCaptchaImage(null);
     setShowDosModal(true);
+    setDosLoading(true);
+
+    try {
+      const res = await fetch(CDC_VERIFY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'fetch_captcha' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCaptchaImage(data.captchaImage);
+        setCsrfToken(data.csrfToken);
+        setCsrfName(data.csrfName || '_csrf-search');
+        setSessionCookies(data.sessionCookies);
+      } else {
+        setDosError(data.error || 'Failed to load CAPTCHA. Please try again.');
+      }
+    } catch (err) {
+      setDosError('Network error: Could not reach verification server.');
+    } finally {
+      setDosLoading(false);
+    }
   };
 
   const handleDosSubmit = async () => {
     setDosLoading(true);
     setDosError(null);
 
-    // SIMULATE API CALL
-    setTimeout(() => {
-      // Validate Captcha (Mock)
-      if (dosCaptcha.length !== 4) {
-        setDosError("Invalid Captcha Code. Please try again.");
+    if (!dosCaptcha) {
+      setDosError('Please enter the verification code.');
+      setDosLoading(false);
+      return;
+    }
+
+    try {
+      // Format DOB from YYYY-MM-DD to dd-mm-yyyy
+      const dobParts = profileData.dateOfBirth.split('-');
+      const formattedDob = dobParts.length === 3
+        ? `${dobParts[2]}-${dobParts[1]}-${dobParts[0]}`
+        : profileData.dateOfBirth;
+
+      setDosStep('fetching');
+
+      const res = await fetch(CDC_VERIFY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'submit_verification',
+          cdcNumber: profileData.cdcNumber,
+          dob: formattedDob,
+          captcha: dosCaptcha,
+          csrfToken,
+          csrfName,
+          sessionCookies,
+        }),
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        if (data.errorType === 'captcha_invalid') {
+          setDosStep('captcha');
+          setDosCaptcha('');
+          setDosError('Invalid CAPTCHA. Please try again.');
+          // Re-fetch captcha
+          openDosModal();
+        } else {
+          setDosStep('captcha');
+          setDosError(data.error || 'Verification failed.');
+        }
         setDosLoading(false);
         return;
       }
 
-      setDosStep('fetching');
-
-      // Simulate Data Fetching Delay
-      setTimeout(() => {
-        // MOCK DATA RESPONSE
-        const mockData = {
-          firstName: 'Mohammad',
-          lastName: 'Rahim',
-          rank: Rank.ABLE_SEAMAN,
-          department: Department.DECK_RATINGS,
-          profilePicture: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?fit=crop&w=200&h=200',
-          seaService: [
-            { id: '1', vesselName: 'MV BANGLA HOPE', rank: 'Ordinary Seaman', signOnDate: '2020-01-10', signOffDate: '2020-11-15', imoNumber: '9123456', shipType: ShipType.GENERAL_CARGO },
-            { id: '2', vesselName: 'MT MEGHNA PRIDE', rank: 'Able Seaman', signOnDate: '2021-03-05', signOffDate: '2021-12-20', imoNumber: '9567890', shipType: ShipType.OIL_TANKER },
-            { id: '3', vesselName: 'MV AKIJ PEARL', rank: 'Able Seaman', signOnDate: '2022-04-01', signOffDate: '2023-01-10', imoNumber: '9345678', shipType: ShipType.BULK_CARRIER },
-          ]
-        };
-
+      // Parse returned data and update profile
+      const cdcInfo = data.cdcInfo;
+      if (cdcInfo?.details && Object.keys(cdcInfo.details).length > 0) {
+        const details = cdcInfo.details;
         setProfileData(prev => ({
           ...prev,
-          firstName: mockData.firstName,
-          lastName: mockData.lastName,
-          rank: mockData.rank,
-          department: mockData.department,
-          profilePicture: mockData.profilePicture,
-          seaServiceHistory: mockData.seaService
+          firstName: details['Name'] || details['SEAFARER NAME'] || details['Seafarer Name'] || prev.firstName,
+          lastName: details['Surname'] || prev.lastName,
         }));
-        setProfilePicPreview(mockData.profilePicture);
+      }
 
-        setDosStep('success');
-        setDosLoading(false);
+      setDosStep('success');
+      setDosLoading(false);
 
-        // Close modal after success
-        setTimeout(() => {
-          setShowDosModal(false);
-        }, 2000);
+      // Close modal after success
+      setTimeout(() => {
+        setShowDosModal(false);
+      }, 2500);
 
-      }, 2000);
-    }, 1000);
+    } catch (err) {
+      setDosStep('captcha');
+      setDosError('Network error: Could not reach verification server.');
+      setDosLoading(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -1033,10 +1084,19 @@ const App: React.FC = () => {
                     </p>
 
                     <div className="bg-slate-100 p-4 rounded-xl border border-slate-200 flex flex-col items-center gap-2">
-                      <div className="bg-white px-6 py-2 rounded-lg font-mono text-xl font-bold tracking-widest text-slate-800 border border-slate-300 select-none">
-                        8 2 A 9
-                      </div>
-                      <p className="text-[10px] text-slate-400">Security Code</p>
+                      {captchaImage ? (
+                        <img src={captchaImage} alt="CAPTCHA" className="rounded-lg border border-slate-300" />
+                      ) : dosLoading ? (
+                        <div className="bg-white px-6 py-4 rounded-lg border border-slate-300 flex items-center gap-2">
+                          <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                          <span className="text-sm text-slate-500">Loading CAPTCHA...</span>
+                        </div>
+                      ) : (
+                        <div className="bg-white px-6 py-4 rounded-lg border border-red-200 text-sm text-red-500">
+                          Failed to load CAPTCHA
+                        </div>
+                      )}
+                      <p className="text-[10px] text-slate-400">Security Code from DOS Server</p>
                     </div>
 
                     <div>
@@ -1045,16 +1105,16 @@ const App: React.FC = () => {
                         type="text"
                         value={dosCaptcha}
                         onChange={(e) => setDosCaptcha(e.target.value)}
-                        className="w-full text-center text-lg tracking-widest p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 uppercase"
-                        placeholder="----"
-                        maxLength={4}
+                        className="w-full text-center text-lg tracking-widest p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter code shown above"
+                        maxLength={10}
                       />
                       {dosError && <p className="text-xs text-red-500 mt-2 font-medium flex items-center justify-center"><AlertTriangle className="w-3 h-3 mr-1" /> {dosError}</p>}
                     </div>
 
                     <button
                       onClick={handleDosSubmit}
-                      disabled={dosLoading || dosCaptcha.length !== 4}
+                      disabled={dosLoading || dosCaptcha.length === 0 || !captchaImage}
                       className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-2"
                     >
                       {dosLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Verify & Fetch Data'}
