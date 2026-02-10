@@ -49,6 +49,7 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
     const [mergeRejected, setMergeRejected] = useState(false);
 
     const [isScanning, setIsScanning] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const [scanResult, setScanResult] = useState<{ title: string; expiry: string; number: string; category: string } | null>(null);
 
     // Form Data State (Controlled Inputs)
@@ -431,7 +432,7 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
                 }
             }
 
-            setIsScanning(true);
+            setIsSaving(true);
 
             const finalDocData = {
                 title: formData.title || selectedFileName,
@@ -490,7 +491,7 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
                 console.error('Upload error:', error);
                 alert("Failed to save document: " + error.message);
             } finally {
-                setIsScanning(false);
+                setIsSaving(false);
             }
         }
     };
@@ -502,6 +503,7 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
         setSelectedFileName('');
         setScanResult(null);
         setIsScanning(false);
+        setIsSaving(false);
         setEditingId(null);
         setIsCameraOpen(false);
         setCameraError(null);
@@ -672,6 +674,11 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
                                         {doc.expiryDate !== 'N/A' && (
                                             <span className="text-[10px] text-slate-400 flex items-center">
                                                 <Clock className="w-3 h-3 mr-1" /> {formatDate(doc.expiryDate)}
+                                            </span>
+                                        )}
+                                        {doc.fileUrl && (
+                                            <span className="text-[9px] text-slate-400 font-mono">
+                                                {(() => { try { const b = Math.round((doc.fileUrl.length * 3) / 4); return b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : (b / 1024).toFixed(0) + ' KB'; } catch { return ''; } })()}
                                             </span>
                                         )}
                                     </div>
@@ -853,11 +860,11 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
                                         <span className="text-xs text-slate-400 font-medium">No image selected</span>
                                     </div>
                                 )}
-                                {isScanning && (
+                                {(isScanning || isSaving) && (
                                     <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white backdrop-blur-sm">
                                         <Loader2 className="w-8 h-8 animate-spin mb-2 text-emerald-400" />
-                                        <span className="text-sm font-bold">Analyzing with Gemini AI...</span>
-                                        <span className="text-xs opacity-70 mt-1">Extracting details automatically</span>
+                                        <span className="text-sm font-bold">{isSaving ? 'Saving Document...' : 'Analyzing with Gemini AI...'}</span>
+                                        <span className="text-xs opacity-70 mt-1">{isSaving ? 'Uploading to server' : 'Extracting details automatically'}</span>
                                     </div>
                                 )}
                             </div>
@@ -943,10 +950,10 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
                             <button onClick={handleCloseModal} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">Cancel</button>
                             <button
                                 onClick={handleSave}
-                                disabled={isScanning || !formData.title || isOffline}
+                                disabled={isScanning || isSaving || !formData.title || isOffline}
                                 className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-900/20 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center transition-all"
                             >
-                                {isScanning ? <Loader2 className="animate-spin w-5 h-5" /> : (editingId ? 'Update' : 'Save Document')}
+                                {isSaving ? <Loader2 className="animate-spin w-5 h-5" /> : isScanning ? <Loader2 className="animate-spin w-5 h-5" /> : (editingId ? 'Update' : 'Save Document')}
                             </button>
                         </div>
                     </div>
