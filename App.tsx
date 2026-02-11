@@ -38,10 +38,8 @@ const App: React.FC = () => {
   const [showDosModal, setShowDosModal] = useState(false);
   const [dosLoading, setDosLoading] = useState(false);
   const [dosError, setDosError] = useState<string | null>(null);
-  const [dosStep, setDosStep] = useState<'loading_captcha' | 'form' | 'submitting' | 'success'>('loading_captcha');
-  const [captchaImage, setCaptchaImage] = useState<string | null>(null);
-  const [captchaInput, setCaptchaInput] = useState('');
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [dosStep, setDosStep] = useState<'instructions' | 'paste_url' | 'fetching' | 'success'>('instructions');
+  const [dosUrl, setDosUrl] = useState('');
 
   useEffect(() => {
     // Network Status Listeners
@@ -492,94 +490,37 @@ const App: React.FC = () => {
       alert("DOS Import requires internet connection.");
       return;
     }
-    if (!profileData.cdcNumber || !profileData.dateOfBirth) {
-      alert("Please enter your CDC Number and Date of Birth first.");
-      return;
-    }
-    setDosStep('loading_captcha');
-    setCaptchaImage(null);
-    setCaptchaInput('');
-    setSessionId(null);
+    setDosStep('instructions');
+    setDosUrl('');
     setDosError(null);
     setShowDosModal(true);
-    loadCaptcha();
-  };
-
-  const loadCaptcha = async () => {
-    setDosStep('loading_captcha');
-    setDosError(null);
-    setCaptchaImage(null);
-    setCaptchaInput('');
-    try {
-      const res = await fetch(CDC_VERIFY_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'init_session' }),
-      });
-      const data = await res.json();
-      if (!data.success) {
-        setDosError(data.error || 'Failed to load CAPTCHA.');
-        setDosStep('form');
-        return;
-      }
-      setCaptchaImage(data.captchaBase64);
-      setSessionId(data.sessionId);
-      setDosStep('form');
-    } catch {
-      setDosError('Network error: Could not reach verification server.');
-      setDosStep('form');
-    }
   };
 
   const handleDosSubmit = async () => {
-    if (!captchaInput.trim()) {
-      setDosError('Please enter the verification code.');
+    if (!dosUrl.trim()) {
+      setDosError('Please enter the URL.');
       return;
-    }
-    if (!sessionId) {
-      setDosError('Session expired. Refreshing CAPTCHA...');
-      loadCaptcha();
-      return;
-    }
-
-    // Convert profileData.dateOfBirth from yyyy-mm-dd to dd-mm-yyyy for DOS
-    let dobForDos = profileData.dateOfBirth || '';
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dobForDos)) {
-      const [y, m, d] = dobForDos.split('-');
-      dobForDos = `${d}-${m}-${y}`;
     }
 
     setDosLoading(true);
     setDosError(null);
-    setDosStep('submitting');
+    setDosStep('fetching');
 
     try {
       const res = await fetch(CDC_VERIFY_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'submit_search',
-          sessionId,
-          cdcNumber: profileData.cdcNumber,
-          dob: dobForDos,
-          captcha: captchaInput.trim(),
+          action: 'scrape_details',
+          url: dosUrl
         }),
       });
       const data = await res.json();
 
       if (!data.success) {
-        // If CAPTCHA was wrong or session expired, reload CAPTCHA
-        if (data.captchaError || data.expired) {
-          setDosError(data.error || 'Incorrect CAPTCHA. Loading new one...');
-          setDosLoading(false);
-          loadCaptcha();
-          return;
-        }
-        setDosStep('form');
         setDosError(data.error || 'Failed to fetch CDC data.');
         setDosLoading(false);
-        // Reload CAPTCHA since session was consumed
-        loadCaptcha();
+        setDosStep('paste_url');
         return;
       }
 
@@ -664,10 +605,9 @@ const App: React.FC = () => {
       }, 2500);
 
     } catch {
-      setDosStep('form');
+      setDosStep('paste_url');
       setDosError('Network error: Could not reach verification server.');
       setDosLoading(false);
-      loadCaptcha();
     }
   };
 
@@ -1147,90 +1087,96 @@ const App: React.FC = () => {
               </div>
 
               <div className="p-6">
-                {dosStep === 'loading_captcha' && (
-                  <div className="py-8 text-center space-y-4">
-                    <div className="relative w-14 h-14 mx-auto">
-                      <div className="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
-                      <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
+                {dosStep === 'instructions' && (
+                  <div className="space-y-4">
+                    <div className="bg-blue-50 rounded-xl p-4 space-y-3 border border-blue-100">
+                      <div className="flex items-start gap-3">
+                        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">1</span>
+                        <p className="text-sm text-slate-700">Click the button below to open the DOS website</p>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">2</span>
+                        <p className="text-sm text-slate-700">Enter your CDC Number: <strong>{profileData.cdcNumber}</strong>, Date of Birth: <strong>{profileData.dateOfBirth}</strong>, and solve the CAPTCHA</p>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">3</span>
+                        <p className="text-sm text-slate-700">On the results page, click <strong>"Details"</strong>, then <strong>copy the URL</strong> from the browser address bar</p>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">4</span>
+                        <p className="text-sm text-slate-700">Return here, paste the URL, and click "Fetch Data"</p>
+                      </div>
                     </div>
-                    <p className="text-sm text-slate-600">Loading verification form...</p>
+
+                    <button
+                      onClick={() => {
+                        window.open('https://erp.gso.gov.bd/frontend/web/cdc-search', '_blank');
+                        setDosStep('paste_url');
+                      }}
+                      className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-colors shadow-lg shadow-blue-200"
+                    >
+                      Open DOS Website <Globe className="w-5 h-5" />
+                    </button>
+
+                    <div className="text-center">
+                      <button onClick={() => setDosStep('paste_url')} className="text-sm text-slate-500 hover:text-blue-600 underline">
+                        I already have the URL
+                      </button>
+                    </div>
                   </div>
                 )}
 
-                {dosStep === 'form' && (
-                  <div className="space-y-4">
-                    <p className="text-sm text-slate-600">
-                      Verify your identity to import CDC data. Just solve the CAPTCHA below.
-                    </p>
-
-                    {/* Pre-filled Info */}
-                    <div className="bg-blue-50 rounded-xl p-3 border border-blue-100 space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-slate-500 uppercase">CDC Number</span>
-                        <span className="text-sm font-mono font-bold text-blue-800">{profileData.cdcNumber}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-slate-500 uppercase">Date of Birth</span>
-                        <span className="text-sm font-mono font-bold text-blue-800">{profileData.dateOfBirth}</span>
-                      </div>
-                    </div>
-
-                    {/* CAPTCHA Image */}
+                {dosStep === 'paste_url' && (
+                  <div className="space-y-4 animate-in slide-in-from-right-10 duration-300">
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Verification Code</label>
-                      <div className="flex items-center gap-3">
-                        <div className="bg-slate-100 rounded-lg p-2 border border-slate-200 flex-shrink-0">
-                          {captchaImage ? (
-                            <img src={captchaImage} alt="CAPTCHA" className="h-12 w-auto" style={{ imageRendering: 'pixelated' }} />
-                          ) : (
-                            <div className="h-12 w-24 flex items-center justify-center text-xs text-slate-400">No image</div>
-                          )}
-                        </div>
-                        <button
-                          onClick={loadCaptcha}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex-shrink-0"
-                          title="Refresh CAPTCHA"
-                        >
-                          <RefreshCw className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* CAPTCHA Input */}
-                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Paste CDC Details URL</label>
                       <input
-                        type="text"
-                        value={captchaInput}
-                        onChange={(e) => setCaptchaInput(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleDosSubmit(); }}
-                        className="w-full text-center text-lg font-mono tracking-widest p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
-                        placeholder="Enter the code above"
+                        type="url"
+                        value={dosUrl}
+                        onChange={(e) => setDosUrl(e.target.value)}
+                        placeholder="https://erp.gso.gov.bd/frontend/web/cdc-search/view?id=..."
+                        className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-mono text-sm"
                         autoFocus
                       />
-                      {dosError && <p className="text-xs text-red-500 mt-2 font-medium flex items-center"><AlertTriangle className="w-3 h-3 mr-1" /> {dosError}</p>}
+                      <p className="text-xs text-slate-500 mt-1">Paste the full URL from the browser address bar after clicking "Details"</p>
                     </div>
 
-                    {/* Submit */}
-                    <button
-                      onClick={handleDosSubmit}
-                      disabled={dosLoading || !captchaInput.trim() || !captchaImage}
-                      className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
-                    >
-                      {dosLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Search className="w-4 h-4" /> Search & Import</>}
-                    </button>
+                    {dosError && (
+                      <div className="p-3 bg-red-50 text-red-700 text-sm rounded-lg flex items-start gap-2 animate-in fade-in slide-in-from-top-2">
+                        <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                        <span>{dosError}</span>
+                      </div>
+                    )}
+
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setDosStep('instructions')}
+                        className="flex-1 py-3 border border-slate-300 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-colors"
+                      >
+                        Back
+                      </button>
+                      <button
+                        onClick={handleDosSubmit}
+                        disabled={!dosUrl.trim() || dosLoading}
+                        className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-colors shadow-lg shadow-blue-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {dosLoading ? <Loader2 className="animate-spin w-5 h-5" /> : 'Fetch Data'}
+                      </button>
+                    </div>
                   </div>
                 )}
 
-                {dosStep === 'submitting' && (
-                  <div className="py-8 text-center space-y-4">
-                    <div className="relative w-16 h-16 mx-auto">
-                      <div className="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
-                      <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
-                      <Anchor className="absolute inset-0 m-auto w-6 h-6 text-blue-600 animate-pulse" />
+                {dosStep === 'fetching' && (
+                  <div className="py-12 flex flex-col items-center justify-center text-center space-y-4 animate-in fade-in duration-300">
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-blue-100 rounded-full animate-ping opacity-75"></div>
+                      <div className="relative bg-white p-4 rounded-full shadow-xl border-4 border-blue-50">
+                        <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
+                      </div>
                     </div>
                     <div>
-                      <h4 className="font-bold text-slate-800">Importing CDC Data...</h4>
-                      <p className="text-xs text-slate-500 mt-1">Searching DOS, parsing records, and looking up ship types</p>
+                      <h4 className="text-lg font-bold text-slate-800">Verifying...</h4>
+                      <p className="text-sm text-slate-500">Connecting to DOS database</p>
                     </div>
                   </div>
                 )}
