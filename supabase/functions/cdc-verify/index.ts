@@ -31,6 +31,304 @@ async function fetchGov(url: string, init?: RequestInit): Promise<Response> {
     }
 }
 
+// ─── In-App Session Store ──────────────────────────────────
+// Stores DOS session cookies + CSRF tokens, keyed by a random sessionId.
+// Each entry expires after 10 minutes.
+
+interface SessionData {
+    cookies: string;
+    csrfToken: string;
+    createdAt: number;
+}
+
+const sessionStore = new Map<string, SessionData>();
+const SESSION_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+function cleanupSessions() {
+    const now = Date.now();
+    for (const [id, data] of sessionStore) {
+        if (now - data.createdAt > SESSION_TTL_MS) {
+            sessionStore.delete(id);
+        }
+    }
+}
+
+function generateSessionId(): string {
+    const arr = new Uint8Array(16);
+    crypto.getRandomValues(arr);
+    return Array.from(arr, b => b.toString(16).padStart(2, "0")).join("");
+}
+
+// ─── Action: init_session ──────────────────────────────────
+// Fetches the DOS search page, gets session cookies + CSRF, fetches the
+// CAPTCHA image, and returns {sessionId, captchaBase64} to the frontend.
+
+async function initSession(): Promise<Response> {
+    cleanupSessions();
+
+    try {
+        // 1. Fetch the search page to get cookies + CSRF token
+        const pageRes = await fetchGov(SEARCH_PAGE, {
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                Accept: "text/html",
+            },
+            redirect: "follow",
+        });
+
+        if (!pageRes.ok) {
+            return jsonResponse({ success: false, error: `DOS site returned HTTP ${pageRes.status}` }, 502);
+        }
+
+        const cookies = extractCookies(pageRes);
+        const html = await pageRes.text();
+
+        // Extract CSRF token from meta tag
+        const csrfMatch = html.match(/name="csrf-token"\s+content="([^"]+)"/);
+        if (!csrfMatch) {
+            return jsonResponse({ success: false, error: "Could not extract CSRF token from DOS page." }, 500);
+        }
+        const csrfToken = csrfMatch[1];
+
+        // Extract CAPTCHA image URL
+        const captchaUrlMatch = html.match(/id="cdcsearchform-captcha-image"\s+src="([^"]+)"/);
+        if (!captchaUrlMatch) {
+            return jsonResponse({ success: false, error: "Could not find CAPTCHA image on DOS page." }, 500);
+        }
+        const captchaPath = captchaUrlMatch[1];
+        const captchaUrl = captchaPath.startsWith("http") ? captchaPath : `${BASE_URL}${captchaPath}`;
+
+        // 2. Fetch the CAPTCHA image using the same session cookies
+        const captchaRes = await fetchGov(captchaUrl, {
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                Cookie: cookies,
+                Referer: SEARCH_PAGE,
+            },
+        });
+
+        if (!captchaRes.ok) {
+            return jsonResponse({ success: false, error: `Failed to fetch CAPTCHA image: HTTP ${captchaRes.status}` }, 502);
+        }
+
+        // Merge any new cookies from the CAPTCHA response
+        const captchaCookies = extractCookies(captchaRes);
+        const allCookies = mergeCookies(cookies, captchaCookies);
+
+        // Convert CAPTCHA to base64
+        const captchaBuffer = await captchaRes.arrayBuffer();
+        const captchaBase64 = btoa(
+            String.fromCharCode(...new Uint8Array(captchaBuffer))
+        );
+
+        // 3. Store session
+        const sessionId = generateSessionId();
+        sessionStore.set(sessionId, {
+            cookies: allCookies,
+            csrfToken,
+            createdAt: Date.now(),
+        });
+
+        return jsonResponse({
+            success: true,
+            sessionId,
+            captchaBase64: `data:image/png;base64,${captchaBase64}`,
+        });
+    } catch (err) {
+        return jsonResponse({ success: false, error: `init_session error: ${(err as Error).message}` }, 500);
+    }
+}
+
+
+// ─── Action: submit_search ─────────────────────────────────
+// Takes {sessionId, cdcNumber, dob, captcha}, POSTs to DOS, parses results.
+
+async function submitSearch(body: {
+    sessionId: string;
+    cdcNumber: string;
+    dob: string;
+    captcha: string;
+}): Promise<Response> {
+    const { sessionId, cdcNumber, dob, captcha } = body;
+
+    if (!sessionId || !cdcNumber || !dob || !captcha) {
+        return jsonResponse({ success: false, error: "Missing required fields: sessionId, cdcNumber, dob, captcha" }, 400);
+    }
+
+    const session = sessionStore.get(sessionId);
+    if (!session) {
+        return jsonResponse({ success: false, error: "Session expired or invalid. Please refresh the CAPTCHA.", expired: true }, 400);
+    }
+
+    // Clean up used session (one-time use)
+    sessionStore.delete(sessionId);
+
+    try {
+        // Build form data
+        const formBody = new URLSearchParams();
+        formBody.append("_csrf-search", session.csrfToken);
+        formBody.append("CdcSearchForm[cdc_number]", cdcNumber);
+        formBody.append("CdcSearchForm[date_of_birth]", dob);
+        formBody.append("CdcSearchForm[captcha]", captcha);
+
+        // POST to DOS
+        const postRes = await fetchGov(SEARCH_ACTION, {
+            method: "POST",
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Content-Type": "application/x-www-form-urlencoded",
+                Cookie: session.cookies,
+                Referer: SEARCH_PAGE,
+                Accept: "text/html",
+            },
+            body: formBody.toString(),
+            redirect: "follow",
+        });
+
+        if (!postRes.ok) {
+            return jsonResponse({ success: false, error: `DOS returned HTTP ${postRes.status}` }, 502);
+        }
+
+        // Merge cookies from response
+        const newCookies = extractCookies(postRes);
+        const allCookies = mergeCookies(session.cookies, newCookies);
+
+        const html = await postRes.text();
+
+        // Check for CAPTCHA error (incorrect verification code)
+        const captchaError = html.match(
+            /field-cdcsearchform-captcha[^>]*has-error/i
+        ) || html.match(
+            /verification code is incorrect/i
+        );
+
+        // Also check if the help-block has an error message for captcha
+        const captchaHelpError = html.match(
+            /field-cdcsearchform-captcha[\s\S]*?help-block-error\s*">\s*([^<]+)/
+        );
+
+        if (captchaError || (captchaHelpError && captchaHelpError[1].trim())) {
+            return jsonResponse({
+                success: false,
+                error: "Incorrect CAPTCHA. Please try again.",
+                captchaError: true,
+            });
+        }
+
+        // Check for "No results found" scenario
+        const noResults = html.includes("No results found") ||
+            html.includes("No data found") ||
+            html.includes("Result not found");
+
+        if (noResults) {
+            return jsonResponse({
+                success: false,
+                error: "No CDC records found for this CDC number and date of birth.",
+            });
+        }
+
+        // Look for a Details/View link
+        const detailsLinkMatch = html.match(
+            /href="([^"]*(?:cdc-search\/view|details|detail)[^"]*)"/i
+        );
+
+        if (detailsLinkMatch) {
+            // Follow the details link to get full info
+            const detailsPath = detailsLinkMatch[1];
+            const detailsUrl = detailsPath.startsWith("http")
+                ? detailsPath
+                : `${BASE_URL}${detailsPath.startsWith("/") ? "" : "/"}${detailsPath}`;
+
+            const detailsRes = await fetchGov(detailsUrl, {
+                headers: {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    Cookie: allCookies,
+                    Referer: SEARCH_ACTION,
+                    Accept: "text/html",
+                },
+                redirect: "follow",
+            });
+
+            if (detailsRes.ok) {
+                const detailsHtml = await detailsRes.text();
+                const cdcInfo = parseDetailsPage(detailsHtml, []);
+
+                // Enrich with ship types
+                const records = cdcInfo.seaServiceRecords as Record<string, string>[];
+                if (records && records.length > 0) {
+                    const shipTypeMap = await lookupShipTypes(records);
+                    for (const rec of records) {
+                        const imoKey = Object.keys(rec).find(k => k.toLowerCase().includes('imo'));
+                        const imo = imoKey ? rec[imoKey]?.trim() : '';
+                        const nameKey = Object.keys(rec).find(k => k.toLowerCase().includes('ship') || k.toLowerCase().includes('vessel'));
+                        const shipName = nameKey ? rec[nameKey]?.trim().toLowerCase() : '';
+                        if (imo && shipTypeMap[imo]) {
+                            rec['_shipType'] = shipTypeMap[imo];
+                        } else if (shipName && shipTypeMap[shipName]) {
+                            rec['_shipType'] = shipTypeMap[shipName];
+                        }
+                    }
+                }
+
+                return jsonResponse({ success: true, cdcInfo });
+            }
+        }
+
+        // If no details link, try to parse the search results page directly
+        const cdcInfo = parseDetailsPage(html, []);
+        if (cdcInfo.detailsAvailable) {
+            return jsonResponse({ success: true, cdcInfo });
+        }
+
+        // Try to extract search results table
+        const tableMatch = html.match(/<table[^>]*>([\s\S]*?)<\/table>/gi);
+        if (tableMatch) {
+            const lastTable = tableMatch[tableMatch.length - 1];
+            const rows = lastTable.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
+            const resultRows: Record<string, string>[] = [];
+            let headers: string[] = [];
+
+            for (const row of rows) {
+                const thCells = row.match(/<th[^>]*>([\s\S]*?)<\/th>/gi);
+                if (thCells && thCells.length > 0) {
+                    headers = thCells.map(th => stripTags(th).trim());
+                    continue;
+                }
+                const tdCells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi);
+                if (tdCells && tdCells.length > 0) {
+                    const rowData: Record<string, string> = {};
+                    tdCells.forEach((td, idx) => {
+                        rowData[headers[idx] || `col_${idx}`] = stripTags(td).trim();
+                    });
+                    resultRows.push(rowData);
+                }
+            }
+
+            if (resultRows.length > 0) {
+                return jsonResponse({
+                    success: true,
+                    cdcInfo: {
+                        searchResults: resultRows,
+                        details: {},
+                        detailsAvailable: false,
+                        note: "Found search results but could not auto-navigate to details page.",
+                    },
+                });
+            }
+        }
+
+        return jsonResponse({
+            success: false,
+            error: "Could not find CDC details. The CAPTCHA may have been incorrect, or the CDC number/DOB may not match.",
+        });
+    } catch (err) {
+        return jsonResponse({
+            success: false,
+            error: `submit_search error: ${(err as Error).message}`,
+        }, 500);
+    }
+}
+
 // ─── Helpers ───────────────────────────────────────────────
 
 /** Extract all Set-Cookie headers and return them as a single cookie string */
@@ -816,6 +1114,12 @@ Deno.serve(async (req: Request) => {
         const { action } = body;
 
         switch (action) {
+            case "init_session":
+                return await initSession();
+
+            case "submit_search":
+                return await submitSearch(body);
+
             case "fetch_captcha":
                 return await fetchCaptcha();
 
@@ -828,7 +1132,7 @@ Deno.serve(async (req: Request) => {
             default:
                 return jsonResponse(
                     {
-                        error: `Unknown action: "${action}". Use "fetch_captcha", "submit_verification", or "scrape_details".`,
+                        error: `Unknown action: "${action}". Use "init_session", "submit_search", "fetch_captcha", "submit_verification", or "scrape_details".`,
                     },
                     400
                 );
