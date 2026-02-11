@@ -619,19 +619,11 @@ const App: React.FC = () => {
           } as SeaServiceRecord;
         });
 
-        // Merge with existing records (avoid duplicates by vessel name + sign-on date)
+        // On re-import: remove old CDC-imported records and replace with fresh data
         const existingRecords = currentUser?.profile?.seaServiceHistory || [];
-        const newRecords = importedRecords.filter(imported =>
-          !existingRecords.some(existing =>
-            existing.vesselName.toLowerCase() === imported.vesselName.toLowerCase() &&
-            existing.signOnDate === imported.signOnDate
-          )
-        );
-
-        if (newRecords.length > 0) {
-          const merged = [...existingRecords, ...newRecords];
-          handleUpdateSeaService(merged);
-        }
+        const manualRecords = existingRecords.filter(r => !r.id.startsWith('cdc_import_'));
+        const merged = [...manualRecords, ...importedRecords];
+        handleUpdateSeaService(merged);
       }
 
       // Handle note (e.g. "this is a search results page")
