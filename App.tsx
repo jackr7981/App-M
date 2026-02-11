@@ -533,8 +533,9 @@ const App: React.FC = () => {
         return;
       }
 
-      // Parse returned data and update profile
       const cdcInfo = data.cdcInfo;
+
+      // ── Update profile details ──
       if (cdcInfo?.details && Object.keys(cdcInfo.details).length > 0) {
         const details = cdcInfo.details;
         setProfileData(prev => ({
@@ -542,7 +543,77 @@ const App: React.FC = () => {
           firstName: details['Name'] || details['SEAFARER NAME'] || details['Seafarer Name'] || details['name'] || prev.firstName,
           lastName: details['Surname'] || details['surname'] || prev.lastName,
         }));
-      } else if (cdcInfo?.note) {
+      }
+
+      // ── Auto-populate sea service records ──
+      if (cdcInfo?.seaServiceRecords && cdcInfo.seaServiceRecords.length > 0) {
+        const importedRecords: SeaServiceRecord[] = cdcInfo.seaServiceRecords.map((row: Record<string, string>, idx: number) => {
+          // Normalize keys to lowercase for matching
+          const lk: Record<string, string> = {};
+          Object.entries(row).forEach(([k, v]) => { lk[k.toLowerCase()] = v; });
+
+          // Helper to find value by partial key match
+          const findVal = (...patterns: string[]): string => {
+            for (const p of patterns) {
+              for (const [k, v] of Object.entries(lk)) {
+                if (k.includes(p) && v) return v;
+              }
+            }
+            return '';
+          };
+
+          // Parse dates: they may come in formats like dd-mm-yyyy, dd/mm/yyyy, yyyy-mm-dd
+          const parseDate = (raw: string): string => {
+            if (!raw) return '';
+            // Already ISO
+            if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+            // dd-mm-yyyy or dd/mm/yyyy
+            const parts = raw.split(/[-\/\.]/);
+            if (parts.length === 3) {
+              const [a, b, c] = parts;
+              // If first part is 4 digits: yyyy-mm-dd
+              if (a.length === 4) return `${a}-${b.padStart(2, '0')}-${c.padStart(2, '0')}`;
+              // If last part is 4 digits: dd-mm-yyyy
+              if (c.length === 4) return `${c}-${b.padStart(2, '0')}-${a.padStart(2, '0')}`;
+            }
+            return raw;
+          };
+
+          const vesselName = findVal('ship', 'vessel') || findVal('name') || `Vessel ${idx + 1}`;
+          const rank = findVal('rank', 'capacity', 'designation') || '';
+          const signOnDate = parseDate(findVal('sign on', 'joining', 'join date', 'sign-on', 'sign_on', 'from'));
+          const signOffDate = parseDate(findVal('sign off', 'leaving', 'leave date', 'sign-off', 'sign_off', 'to'));
+          const imoNumber = findVal('imo') || '';
+          const shipType = findVal('type', 'ship type', 'vessel type') || '';
+
+          return {
+            id: `cdc_import_${Date.now()}_${idx}`,
+            vesselName,
+            rank,
+            shipType,
+            signOnDate,
+            signOffDate,
+            imoNumber,
+          } as SeaServiceRecord;
+        });
+
+        // Merge with existing records (avoid duplicates by vessel name + sign-on date)
+        const existingRecords = currentUser?.profile?.seaServiceHistory || [];
+        const newRecords = importedRecords.filter(imported =>
+          !existingRecords.some(existing =>
+            existing.vesselName.toLowerCase() === imported.vesselName.toLowerCase() &&
+            existing.signOnDate === imported.signOnDate
+          )
+        );
+
+        if (newRecords.length > 0) {
+          const merged = [...existingRecords, ...newRecords];
+          handleUpdateSeaService(merged);
+        }
+      }
+
+      // Handle note (e.g. "this is a search results page")
+      if (cdcInfo?.note && !cdcInfo?.detailsAvailable) {
         setDosStep('paste_url');
         setDosError(cdcInfo.note);
         setDosLoading(false);
@@ -1131,7 +1202,7 @@ const App: React.FC = () => {
                     <div>
                       <h4 className="font-bold text-slate-800 text-lg">Data Imported!</h4>
                       <p className="text-sm text-slate-600 mt-1">
-                        Your CDC information has been imported to your profile.
+                        Your CDC information and sea service records have been imported. Check the Sea Service tab!
                       </p>
                     </div>
                   </div>

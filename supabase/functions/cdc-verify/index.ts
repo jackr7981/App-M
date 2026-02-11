@@ -499,10 +499,51 @@ function parseDetailsPage(
         info["photo_url"] = photoUrl;
     }
 
+    // ── Sea Service Table Extraction ──────────────────
+    // Find ALL tables on the page and identify the sea service table(s)
+    const allTables = html.match(/<table[^>]*>([\s\S]*?)<\/table>/gi) || [];
+    const seaServiceRecords: Record<string, string>[] = [];
+
+    for (const table of allTables) {
+        const rows = table.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
+        let tableHeaders: string[] = [];
+        const tableRows: Record<string, string>[] = [];
+
+        for (const row of rows) {
+            const thCells = row.match(/<th[^>]*>([\s\S]*?)<\/th>/gi);
+            if (thCells && thCells.length > 0) {
+                tableHeaders = thCells.map(th => stripTags(th).trim().toUpperCase());
+                continue;
+            }
+            const tdCells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi);
+            if (tdCells && tdCells.length > 0) {
+                const rowData: Record<string, string> = {};
+                tdCells.forEach((td, idx) => {
+                    const key = tableHeaders[idx] || `COL_${idx}`;
+                    rowData[key] = stripTags(td).trim();
+                });
+                tableRows.push(rowData);
+            }
+        }
+
+        // Detect if this is a sea service table by checking headers
+        const headerStr = tableHeaders.join(" ").toLowerCase();
+        const isSeaServiceTable =
+            (headerStr.includes("ship") || headerStr.includes("vessel")) &&
+            (headerStr.includes("sign") || headerStr.includes("date") ||
+                headerStr.includes("rank") || headerStr.includes("capacity") ||
+                headerStr.includes("joining") || headerStr.includes("leaving"));
+
+        if (isSeaServiceTable && tableRows.length > 0) {
+            seaServiceRecords.push(...tableRows);
+        }
+    }
+
     return {
         searchResults,
         details: info,
         detailsAvailable: Object.keys(info).length > 0,
+        seaServiceRecords,
     };
 }
 
