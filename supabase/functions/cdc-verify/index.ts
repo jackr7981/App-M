@@ -651,12 +651,17 @@ async function scrapeDetails(body: { url: string }): Promise<Response> {
         const records = cdcInfo.seaServiceRecords as Record<string, string>[];
         if (records && records.length > 0) {
             const shipTypeMap = await lookupShipTypes(records);
-            // Apply ship types to records
+            // Apply ship types to records (try IMO first, then ship name)
             for (const rec of records) {
                 const imoKey = Object.keys(rec).find(k => k.toLowerCase().includes('imo'));
                 const imo = imoKey ? rec[imoKey]?.trim() : '';
+                const nameKey = Object.keys(rec).find(k => k.toLowerCase().includes('ship') || k.toLowerCase().includes('vessel'));
+                const shipName = nameKey ? rec[nameKey]?.trim().toLowerCase() : '';
+
                 if (imo && shipTypeMap[imo]) {
                     rec['_shipType'] = shipTypeMap[imo];
+                } else if (shipName && shipTypeMap[shipName]) {
+                    rec['_shipType'] = shipTypeMap[shipName];
                 }
             }
         }
@@ -678,50 +683,100 @@ async function scrapeDetails(body: { url: string }): Promise<Response> {
 
 // ─── Ship Type Lookup via VesselFinder ────────────────────
 
+const VF_HEADERS = {
+    "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    Accept: "text/html",
+};
+
+function extractShipTypeFromHtml(html: string): string | null {
+    const match = html.match(
+        /<td[^>]*class="tpc1"[^>]*>Ship Type<\/td>\s*<td[^>]*class="tpc2"[^>]*>([^<]+)<\/td>/i
+    );
+    return match ? match[1].trim() : null;
+}
+
 async function lookupShipTypes(
     records: Record<string, string>[]
 ): Promise<Record<string, string>> {
-    // Collect unique non-empty IMO numbers
-    const imoSet = new Set<string>();
+    // shipTypeMap: keyed by IMO number AND ship name (lowercased)
+    const shipTypeMap: Record<string, string> = {};
+
+    // Collect lookup tasks: { imo?, shipName }
+    const lookupTasks: { imo: string; shipName: string }[] = [];
+    const seen = new Set<string>();
+
     for (const rec of records) {
         const imoKey = Object.keys(rec).find(k => k.toLowerCase().includes('imo'));
         const imo = imoKey ? rec[imoKey]?.trim() : '';
-        if (imo && /^\d{5,}$/.test(imo)) {
-            imoSet.add(imo);
-        }
+        const nameKey = Object.keys(rec).find(k => k.toLowerCase().includes('ship') || k.toLowerCase().includes('vessel'));
+        const shipName = nameKey ? rec[nameKey]?.trim() : '';
+
+        const dedupKey = imo || shipName.toLowerCase();
+        if (!dedupKey || seen.has(dedupKey)) continue;
+        seen.add(dedupKey);
+
+        lookupTasks.push({ imo: /^\d{5,}$/.test(imo) ? imo : '', shipName });
     }
 
-    const shipTypeMap: Record<string, string> = {};
-    if (imoSet.size === 0) return shipTypeMap;
+    if (lookupTasks.length === 0) return shipTypeMap;
 
-    // Fetch ship types concurrently from VesselFinder
-    const lookups = Array.from(imoSet).map(async (imo) => {
+    // Process all lookups concurrently
+    const lookups = lookupTasks.map(async ({ imo, shipName }) => {
         try {
             const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 5000);
+            const timeout = setTimeout(() => controller.abort(), 8000);
 
-            const res = await fetch(
-                `https://www.vesselfinder.com/vessels/details/${imo}`,
-                {
-                    headers: {
-                        "User-Agent":
-                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                        Accept: "text/html",
-                    },
-                    signal: controller.signal,
+            let shipType: string | null = null;
+
+            if (imo) {
+                // ── Lookup by IMO directly ──
+                const res = await fetch(
+                    `https://www.vesselfinder.com/vessels/details/${imo}`,
+                    { headers: VF_HEADERS, signal: controller.signal }
+                );
+                if (res.ok) {
+                    const html = await res.text();
+                    shipType = extractShipTypeFromHtml(html);
                 }
-            );
+            }
+
+            if (!shipType && shipName) {
+                // ── Fallback: Search by ship name ──
+                const cleanName = shipName
+                    .replace(/^(M\.?V\.?\s*|S\.?S\.?\s*|MT\.?\s*)/i, '')
+                    .trim();
+                const searchUrl = `https://www.vesselfinder.com/vessels?name=${encodeURIComponent(cleanName)}`;
+                const searchRes = await fetch(searchUrl, {
+                    headers: VF_HEADERS,
+                    signal: controller.signal,
+                });
+
+                if (searchRes.ok) {
+                    const searchHtml = await searchRes.text();
+                    // Extract first result's details link: /vessels/details/IMO_NUMBER
+                    const linkMatch = searchHtml.match(
+                        /href="\/vessels\/details\/(\d+)"/
+                    );
+                    if (linkMatch) {
+                        const detailsUrl = `https://www.vesselfinder.com/vessels/details/${linkMatch[1]}`;
+                        const detailsRes = await fetch(detailsUrl, {
+                            headers: VF_HEADERS,
+                            signal: controller.signal,
+                        });
+                        if (detailsRes.ok) {
+                            const detailsHtml = await detailsRes.text();
+                            shipType = extractShipTypeFromHtml(detailsHtml);
+                        }
+                    }
+                }
+            }
+
             clearTimeout(timeout);
 
-            if (!res.ok) return;
-
-            const html = await res.text();
-            // Pattern: <td class="tpc1">Ship Type</td><td class="tpc2">VALUE</td>
-            const match = html.match(
-                /<td[^>]*class="tpc1"[^>]*>Ship Type<\/td>\s*<td[^>]*class="tpc2"[^>]*>([^<]+)<\/td>/i
-            );
-            if (match) {
-                shipTypeMap[imo] = match[1].trim();
+            if (shipType) {
+                if (imo) shipTypeMap[imo] = shipType;
+                shipTypeMap[shipName.toLowerCase()] = shipType;
             }
         } catch {
             // Silently skip failed lookups
