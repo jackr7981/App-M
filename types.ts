@@ -95,6 +95,14 @@ export interface SeaServiceRecord {
   duration?: string;
 }
 
+export enum Institution {
+  BMA = 'Bangladesh Marine Academy',
+  BMFA = 'Bangladesh Marine Fisheries Academy',
+  DIRECT = 'Direct Entry',
+  PRIVATE = 'Private Academy',
+  OTHER = 'Other'
+}
+
 export interface UserProfile {
   firstName: string;
   lastName: string;
@@ -109,6 +117,7 @@ export interface UserProfile {
   isOpenForWork?: boolean;
   isOnboard?: boolean; // New field: true = At Sea, false = At Home
   totalUsageMinutes?: number; // Total time spent in app
+  institution?: Institution | string;
 }
 
 export interface User {

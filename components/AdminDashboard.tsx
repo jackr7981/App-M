@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, UserProfile, ShipType, Rank, DocumentCategory, MarinerDocument, Department, JobPosting } from '../types';
-import { LogOut, Users, FileCheck, Anchor, Search, ChevronRight, ArrowLeft, BarChart, Shield, HardDrive, Database, FileText, Clock, Briefcase, PlusCircle, CheckCircle, XCircle, Sparkles, Loader2 } from 'lucide-react';
+import { User, UserProfile, ShipType, Rank, DocumentCategory, MarinerDocument, Department, JobPosting, Institution } from '../types';
+import { LogOut, Users, FileCheck, Anchor, Search, ChevronRight, ArrowLeft, BarChart, Shield, HardDrive, Database, FileText, Clock, Briefcase, PlusCircle, CheckCircle, XCircle, Sparkles, Loader2, School } from 'lucide-react';
 import { parseJobPosting } from '../services/geminiService';
 import { Documents } from './Documents';
 import { supabase, isMockMode } from '../services/supabase';
@@ -311,6 +311,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         return bytes + ' B';
     };
 
+    const handleInstitutionChange = async (userId: string, institution: string) => {
+        const { error } = await supabase.from('profiles').update({ institution }).eq('id', userId);
+        if (!error) {
+            // Update local state
+            if (selectedUser && selectedUser.id === userId) {
+                setSelectedUser(prev => prev ? { ...prev, profile: { ...prev.profile!, institution } } : null);
+            }
+            setUsers(prev => prev.map(u => u.id === userId ? { ...u, profile: { ...u.profile!, institution } } : u));
+        } else {
+            console.error('Failed to update institution:', error);
+            alert('Failed to update institution');
+        }
+    };
+
     // If drill-down view is active
     if (selectedUser) {
         return (
@@ -327,6 +341,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                     </div>
                 </header>
                 <main className="flex-1 container mx-auto p-4">
+                    {/* Institution Selector */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-6">
+                        <h2 className="font-bold text-slate-800 mb-4 flex items-center">
+                            <School className="w-5 h-5 mr-2 text-emerald-600" /> Institution / Alumni Association
+                        </h2>
+                        <div className="flex gap-4 items-center">
+                            <select
+                                value={selectedUser.profile?.institution || ''}
+                                onChange={(e) => handleInstitutionChange(selectedUser.id, e.target.value)}
+                                className="p-3 border border-slate-300 rounded-xl text-sm w-full max-w-md focus:ring-2 focus:ring-emerald-500 outline-none"
+                            >
+                                <option value="">Select Institution...</option>
+                                {Object.values(Institution).map(inst => (
+                                    <option key={inst} value={inst}>{inst}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
                     <Documents
                         documents={userDocuments}
                         onAddDocument={() => { }}
@@ -613,8 +646,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                             <div>
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${(job as any).status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
-                                                            (job as any).status === 'rejected' ? 'bg-red-100 text-red-700' :
-                                                                'bg-yellow-100 text-yellow-700'
+                                                        (job as any).status === 'rejected' ? 'bg-red-100 text-red-700' :
+                                                            'bg-yellow-100 text-yellow-700'
                                                         }`}>{(job as any).status}</span>
                                                     <span className="text-xs text-slate-400">• {job.source}</span>
                                                 </div>
