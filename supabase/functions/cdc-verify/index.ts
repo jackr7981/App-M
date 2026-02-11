@@ -647,6 +647,20 @@ async function scrapeDetails(body: { url: string }): Promise<Response> {
             });
         }
 
+        // ── Enrich sea service records with ship types from VesselFinder ──
+        const records = cdcInfo.seaServiceRecords as Record<string, string>[];
+        if (records && records.length > 0) {
+            const shipTypeMap = await lookupShipTypes(records);
+            // Apply ship types to records
+            for (const rec of records) {
+                const imoKey = Object.keys(rec).find(k => k.toLowerCase().includes('imo'));
+                const imo = imoKey ? rec[imoKey]?.trim() : '';
+                if (imo && shipTypeMap[imo]) {
+                    rec['_shipType'] = shipTypeMap[imo];
+                }
+            }
+        }
+
         return jsonResponse({
             success: true,
             cdcInfo,
@@ -660,6 +674,62 @@ async function scrapeDetails(body: { url: string }): Promise<Response> {
             500
         );
     }
+}
+
+// ─── Ship Type Lookup via VesselFinder ────────────────────
+
+async function lookupShipTypes(
+    records: Record<string, string>[]
+): Promise<Record<string, string>> {
+    // Collect unique non-empty IMO numbers
+    const imoSet = new Set<string>();
+    for (const rec of records) {
+        const imoKey = Object.keys(rec).find(k => k.toLowerCase().includes('imo'));
+        const imo = imoKey ? rec[imoKey]?.trim() : '';
+        if (imo && /^\d{5,}$/.test(imo)) {
+            imoSet.add(imo);
+        }
+    }
+
+    const shipTypeMap: Record<string, string> = {};
+    if (imoSet.size === 0) return shipTypeMap;
+
+    // Fetch ship types concurrently from VesselFinder
+    const lookups = Array.from(imoSet).map(async (imo) => {
+        try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 5000);
+
+            const res = await fetch(
+                `https://www.vesselfinder.com/vessels/details/${imo}`,
+                {
+                    headers: {
+                        "User-Agent":
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                        Accept: "text/html",
+                    },
+                    signal: controller.signal,
+                }
+            );
+            clearTimeout(timeout);
+
+            if (!res.ok) return;
+
+            const html = await res.text();
+            // Pattern: <td class="tpc1">Ship Type</td><td class="tpc2">VALUE</td>
+            const match = html.match(
+                /<td[^>]*class="tpc1"[^>]*>Ship Type<\/td>\s*<td[^>]*class="tpc2"[^>]*>([^<]+)<\/td>/i
+            );
+            if (match) {
+                shipTypeMap[imo] = match[1].trim();
+            }
+        } catch {
+            // Silently skip failed lookups
+        }
+    });
+
+    await Promise.all(lookups);
+    return shipTypeMap;
 }
 
 // ─── Response helper ──────────────────────────────────────

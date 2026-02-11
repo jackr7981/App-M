@@ -606,7 +606,8 @@ const App: React.FC = () => {
           );
 
           const imoNumber = findVal('imo', 'imo no', 'imo number', 'i.m.o');
-          const shipType = findVal('type', 'ship type', 'vessel type');
+          // _shipType is injected by the Edge Function from VesselFinder lookup
+          const shipType = row['_shipType'] || findVal('type', 'ship type', 'vessel type');
 
           return {
             id: `cdc_import_${Date.now()}_${idx}`,
