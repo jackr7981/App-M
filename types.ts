@@ -143,11 +143,15 @@ export interface ManningAgent {
 
 export interface MedicalCenter {
   id: string;
-  name: string; // Center name or Doctor name
-  approvalNumber: string; // DG Shipping Approval No
+  name: string; // Doctor name
+  centerName?: string; // Diagnostic center or hospital name
+  approvalNumber: string; // Govt. Registration No
   address: string;
   phone: string;
+  email?: string;
+  website?: string;
   city: 'Dhaka' | 'Chittagong' | 'Khulna' | 'Other';
+  specialty?: 'General' | 'Eye Specialist';
   status: 'Approved' | 'Suspended';
   isCenter: boolean; // True if diagnostic center, False if individual doctor chamber
 }
