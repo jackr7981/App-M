@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, UserProfile, ShipType, Rank, DocumentCategory, MarinerDocument, Department } from '../types';
-import { LogOut, Users, FileCheck, Anchor, Search, ChevronRight, ArrowLeft, BarChart, Shield, HardDrive, Database, FileText, Clock } from 'lucide-react';
+import { User, UserProfile, ShipType, Rank, DocumentCategory, MarinerDocument, Department, JobPosting } from '../types';
+import { LogOut, Users, FileCheck, Anchor, Search, ChevronRight, ArrowLeft, BarChart, Shield, HardDrive, Database, FileText, Clock, Briefcase, PlusCircle, CheckCircle, XCircle, Sparkles, Loader2 } from 'lucide-react';
+import { parseJobPosting } from '../services/geminiService';
 import { Documents } from './Documents';
 import { supabase, isMockMode } from '../services/supabase';
 
@@ -77,13 +78,20 @@ const generateMockDocuments = (userId: string): MarinerDocument[] => {
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     const [users, setUsers] = useState<User[]>([]);
-    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'storage'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'storage' | 'jobs'>('overview');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [userDocuments, setUserDocuments] = useState<MarinerDocument[]>([]);
     const [storageStats, setStorageStats] = useState<UserStorageInfo[]>([]);
     const [totalDocs, setTotalDocs] = useState(0);
     const [isLoadingStorage, setIsLoadingStorage] = useState(false);
+
+    // Jobs State
+    const [jobs, setJobs] = useState<JobPosting[]>([]);
+    const [jobsLoading, setJobsLoading] = useState(false);
+    const [showImport, setShowImport] = useState(false);
+    const [importText, setImportText] = useState('');
+    const [isParsing, setIsParsing] = useState(false);
 
     useEffect(() => {
         // Fetch Users logic
@@ -173,6 +181,73 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         };
         if (users.length > 0) loadStorageStats();
     }, [users]);
+
+    // Load Jobs
+    const fetchJobs = async () => {
+        if (activeTab !== 'jobs') return;
+        setJobsLoading(true);
+        const { data, error } = await supabase
+            .from('job_postings')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (data) {
+            const mappedJobs: JobPosting[] = data.map((item: any) => ({
+                id: item.id,
+                rank: item.parsed_content?.rank || 'Unknown',
+                shipType: item.parsed_content?.shipType || 'Unknown',
+                wage: item.parsed_content?.wage,
+                joiningDate: item.parsed_content?.joiningDate,
+                description: item.parsed_content?.description || item.raw_content,
+                contactInfo: item.parsed_content?.contactInfo || item.parsed_content?.contact || 'N/A',
+                source: item.source,
+                postedDate: new Date(item.created_at).getTime(),
+                companyName: item.parsed_content?.companyName || item.parsed_content?.company,
+                // We need to store status in JobPosting to show it in UI? 
+                // JobPosting interface in types.ts doesn't have status. 
+                // I should add it to types.ts or just handle it locally.
+                // For Admin, status is crucial.
+                // I'll alias it or extend the type locally.
+                status: item.status
+            } as JobPosting & { status: string }));
+            setJobs(mappedJobs);
+        }
+        setJobsLoading(false);
+    };
+
+    useEffect(() => {
+        fetchJobs();
+    }, [activeTab]);
+
+    const handleJobStatusChange = async (id: string, newStatus: string) => {
+        const { error } = await supabase.from('job_postings').update({ status: newStatus }).eq('id', id);
+        if (!error) {
+            setJobs(prev => prev.map(j => (j.id === id ? { ...j, status: newStatus } : j) as JobPosting));
+        }
+    };
+
+    const handleSmartImport = async () => {
+        if (!importText.trim()) return;
+        setIsParsing(true);
+        try {
+            const parsed = await parseJobPosting(importText);
+            const { error } = await supabase.from('job_postings').insert({
+                source: 'Manual',
+                raw_content: importText,
+                parsed_content: parsed,
+                status: 'approved'
+            });
+            if (error) throw error;
+            setShowImport(false);
+            setImportText('');
+            fetchJobs();
+        } catch (e) {
+            console.error(e);
+            alert('Failed to import job: ' + (e as Error).message);
+        } finally {
+            setIsParsing(false);
+        }
+    };
 
     const handleUserClick = async (user: User) => {
         setSelectedUser(user);
@@ -293,6 +368,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                         className={`px-6 py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'users' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                     >
                         <Users className="w-4 h-4 inline-block mr-2" /> Mariners
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('jobs')}
+                        className={`px-6 py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'jobs' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                    >
+                        <Briefcase className="w-4 h-4 inline-block mr-2" /> Job Board
                     </button>
                     <button
                         onClick={() => setActiveTab('storage')}
@@ -501,6 +582,91 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                 <div className="p-8 text-center text-slate-400">No storage data available</div>
                             )}
                         </div>
+                    </div>
+                )}
+
+                {activeTab === 'jobs' && (
+                    <div className="space-y-6 animate-fade-in">
+                        {/* Header */}
+                        <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                            <h2 className="text-xl font-bold text-slate-800 flex items-center">
+                                <Briefcase className="w-5 h-5 mr-2 text-emerald-600" /> Job Postings
+                            </h2>
+                            <button
+                                onClick={() => setShowImport(true)}
+                                className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center hover:bg-emerald-700 transition-colors"
+                            >
+                                <PlusCircle className="w-4 h-4 mr-2" /> Import Job
+                            </button>
+                        </div>
+
+                        {/* Job List */}
+                        <div className="space-y-4">
+                            {jobsLoading ? (
+                                <div className="text-center py-12"><Loader2 className="w-8 h-8 animate-spin mx-auto text-emerald-500" /></div>
+                            ) : jobs.length === 0 ? (
+                                <div className="text-center py-12 text-slate-400">No jobs found. Import one!</div>
+                            ) : (
+                                jobs.map(job => (
+                                    <div key={job.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 relative">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${(job as any).status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                                                            (job as any).status === 'rejected' ? 'bg-red-100 text-red-700' :
+                                                                'bg-yellow-100 text-yellow-700'
+                                                        }`}>{(job as any).status}</span>
+                                                    <span className="text-xs text-slate-400">• {job.source}</span>
+                                                </div>
+                                                <h3 className="font-bold text-lg">{job.rank}</h3>
+                                                <p className="text-sm text-slate-600">{job.shipType} • {job.wage}</p>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                {(job as any).status === 'pending' && (
+                                                    <>
+                                                        <button onClick={() => handleJobStatusChange(job.id, 'approved')} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100" title="Approve"><CheckCircle className="w-5 h-5" /></button>
+                                                        <button onClick={() => handleJobStatusChange(job.id, 'rejected')} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100" title="Reject"><XCircle className="w-5 h-5" /></button>
+                                                    </>
+                                                )}
+                                                {(job as any).status !== 'pending' && (
+                                                    <button onClick={() => handleJobStatusChange(job.id, 'pending')} className="text-xs text-slate-400 underline">Reset</button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="mt-2 text-sm text-slate-600 bg-slate-50 p-2 rounded border border-slate-100">
+                                            {job.description}
+                                        </div>
+                                        <div className="mt-2 text-xs text-slate-500 font-mono">
+                                            Contact: {job.contactInfo}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+
+                        {/* Import Modal */}
+                        {showImport && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                                <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowImport(false)}></div>
+                                <div className="relative bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl">
+                                    <h3 className="text-xl font-bold mb-4 flex items-center"><Sparkles className="w-5 h-5 text-emerald-500 mr-2" /> Import Job</h3>
+                                    <textarea
+                                        value={importText}
+                                        onChange={(e) => setImportText(e.target.value)}
+                                        placeholder="Paste job text here..."
+                                        className="w-full h-40 p-4 border rounded-xl bg-slate-50 outline-none text-sm resize-none mb-4"
+                                        disabled={isParsing}
+                                    ></textarea>
+                                    <button
+                                        onClick={handleSmartImport}
+                                        disabled={isParsing || !importText.trim()}
+                                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center justify-center disabled:opacity-70"
+                                    >
+                                        {isParsing ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Parse & Save'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 

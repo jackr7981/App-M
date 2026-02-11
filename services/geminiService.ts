@@ -1,5 +1,6 @@
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { JobPosting } from "../types";
+import { supabase } from "./supabase";
 
 // Lazy-initialize Gemini Client to prevent crash at module load when API key is missing.
 // The API key is read from the Vite env variable VITE_GEMINI_API_KEY or process.env.API_KEY.
@@ -139,37 +140,25 @@ export const analyzeDocumentImage = async (base64Image: string): Promise<Scanned
 
 export const parseJobPosting = async (text: string): Promise<Partial<JobPosting>> => {
   try {
-    const response = await getAI().models.generateContent({
-      model: 'gemini-2.5-flash-lite',
-      contents: `Extract maritime job details from the following unstructured text. Return JSON. Text: "${text}"`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            rank: { type: Type.STRING },
-            shipType: { type: Type.STRING },
-            wage: { type: Type.STRING },
-            joiningDate: { type: Type.STRING },
-            description: { type: Type.STRING },
-            contactInfo: { type: Type.STRING },
-            companyName: { type: Type.STRING }
-          },
-          required: ["rank", "shipType", "description", "contactInfo"]
-        }
-      }
+    // Call the Edge Function 'job-parser'
+    const { data, error } = await supabase.functions.invoke('job-parser', {
+      body: { raw_content: text }
     });
 
-    if (response.text) {
-      let cleanText = response.text.trim();
-      if (cleanText.startsWith('```json')) {
-        cleanText = cleanText.replace(/```json/g, '').replace(/```/g, '');
-      }
-      return JSON.parse(cleanText) as Partial<JobPosting>;
+    if (error) {
+      console.error("Link to shore parsing service failed:", error);
+      throw error;
     }
-    throw new Error("Failed to parse job");
+
+    if (data && data.success && data.data) {
+      return data.data as Partial<JobPosting>;
+    } else {
+      throw new Error(data?.error || "Invalid response from AI service");
+    }
+
   } catch (error) {
     console.error("Job Parsing Error:", error);
+    // Fallback: Return raw text description
     return {
       description: text,
       rank: "Unknown",

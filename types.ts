@@ -165,7 +165,7 @@ export interface JobPosting {
   joiningDate?: string;
   description: string;
   contactInfo: string; // Phone or Email
-  source: 'WhatsApp' | 'Telegram' | 'Direct' | 'Other';
+  source: 'WhatsApp' | 'Telegram' | 'Facebook' | 'Manual' | 'Direct' | 'Other';
   postedDate: number;
   companyName?: string;
 }
