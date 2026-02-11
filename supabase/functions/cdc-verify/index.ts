@@ -67,6 +67,7 @@ async function initSession(): Promise<Response> {
     cleanupSessions();
 
     try {
+        console.log("[CDC] init_session started");
         // 1. Fetch the search page to get cookies + CSRF token
         const pageRes = await fetchGov(SEARCH_PAGE, {
             headers: {
@@ -77,15 +78,19 @@ async function initSession(): Promise<Response> {
         });
 
         if (!pageRes.ok) {
+            console.error(`[CDC] DOS site returned HTTP ${pageRes.status}`);
             return jsonResponse({ success: false, error: `DOS site returned HTTP ${pageRes.status}` }, 502);
         }
 
         const cookies = extractCookies(pageRes);
+        console.log(`[CDC] Page cookies: ${cookies}`);
+
         const html = await pageRes.text();
 
         // Extract CSRF token from meta tag
         const csrfMatch = html.match(/name="csrf-token"\s+content="([^"]+)"/);
         if (!csrfMatch) {
+            console.error("[CDC] Could not extract CSRF token.");
             return jsonResponse({ success: false, error: "Could not extract CSRF token from DOS page." }, 500);
         }
         const csrfToken = csrfMatch[1];
@@ -93,10 +98,13 @@ async function initSession(): Promise<Response> {
         // Extract CAPTCHA image URL
         const captchaUrlMatch = html.match(/id="cdcsearchform-captcha-image"\s+src="([^"]+)"/);
         if (!captchaUrlMatch) {
+            console.error("[CDC] Could not find CAPTCHA image URL.");
             return jsonResponse({ success: false, error: "Could not find CAPTCHA image on DOS page." }, 500);
         }
         const captchaPath = captchaUrlMatch[1];
         const captchaUrl = captchaPath.startsWith("http") ? captchaPath : `${BASE_URL}${captchaPath}`;
+
+        console.log(`[CDC] Fetching CAPTCHA from: ${captchaUrl}`);
 
         // 2. Fetch the CAPTCHA image using the same session cookies
         const captchaRes = await fetchGov(captchaUrl, {
@@ -108,12 +116,15 @@ async function initSession(): Promise<Response> {
         });
 
         if (!captchaRes.ok) {
+            console.error(`[CDC] Failed to fetch CAPTCHA image: HTTP ${captchaRes.status}`);
             return jsonResponse({ success: false, error: `Failed to fetch CAPTCHA image: HTTP ${captchaRes.status}` }, 502);
         }
 
         // Merge any new cookies from the CAPTCHA response
         const captchaCookies = extractCookies(captchaRes);
+        console.log(`[CDC] CAPTCHA cookies: ${captchaCookies}`);
         const allCookies = mergeCookies(cookies, captchaCookies);
+        console.log(`[CDC] Final session cookies: ${allCookies}`);
 
         // Convert CAPTCHA to base64
         const captchaBuffer = await captchaRes.arrayBuffer();
@@ -128,6 +139,7 @@ async function initSession(): Promise<Response> {
             csrfToken,
             createdAt: Date.now(),
         });
+        console.log(`[CDC] Session created: ${sessionId}`);
 
         return jsonResponse({
             success: true,
@@ -135,6 +147,7 @@ async function initSession(): Promise<Response> {
             captchaBase64: `data:image/png;base64,${captchaBase64}`,
         });
     } catch (err) {
+        console.error(`[CDC] init_session error: ${(err as Error).message}`);
         return jsonResponse({ success: false, error: `init_session error: ${(err as Error).message}` }, 500);
     }
 }
@@ -157,13 +170,16 @@ async function submitSearch(body: {
 
     const session = sessionStore.get(sessionId);
     if (!session) {
+        console.warn(`[CDC] Session expired/not found: ${sessionId}`);
         return jsonResponse({ success: false, error: "Session expired or invalid. Please refresh the CAPTCHA.", expired: true }, 400);
     }
 
-    // Clean up used session (one-time use)
+    // Clean up used session
     sessionStore.delete(sessionId);
 
     try {
+        console.log(`[CDC] Submitting search for ${sessionId} with Cookies: ${session.cookies}`);
+
         // Build form data
         const formBody = new URLSearchParams();
         formBody.append("_csrf-search", session.csrfToken);
@@ -179,6 +195,8 @@ async function submitSearch(body: {
                 "Content-Type": "application/x-www-form-urlencoded",
                 Cookie: session.cookies,
                 Referer: SEARCH_PAGE,
+                Origin: BASE_URL, // Added Origin
+                "X-CSRF-Token": session.csrfToken, // Added X-CSRF-Token just in case
                 Accept: "text/html",
             },
             body: formBody.toString(),
@@ -186,6 +204,7 @@ async function submitSearch(body: {
         });
 
         if (!postRes.ok) {
+            console.error(`[CDC] POST failed: HTTP ${postRes.status}`);
             return jsonResponse({ success: false, error: `DOS returned HTTP ${postRes.status}` }, 502);
         }
 
