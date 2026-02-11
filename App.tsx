@@ -547,44 +547,66 @@ const App: React.FC = () => {
 
       // ── Auto-populate sea service records ──
       if (cdcInfo?.seaServiceRecords && cdcInfo.seaServiceRecords.length > 0) {
-        const importedRecords: SeaServiceRecord[] = cdcInfo.seaServiceRecords.map((row: Record<string, string>, idx: number) => {
-          // Normalize keys to lowercase for matching
-          const lk: Record<string, string> = {};
-          Object.entries(row).forEach(([k, v]) => { lk[k.toLowerCase()] = v; });
+        // DEBUG: Log the raw headers and first record to see actual CDC column names
+        console.log('[CDC Import] Table headers from page:', JSON.stringify(cdcInfo.tableHeaders));
+        console.log('[CDC Import] First record keys:', Object.keys(cdcInfo.seaServiceRecords[0]));
+        console.log('[CDC Import] First record:', JSON.stringify(cdcInfo.seaServiceRecords[0]));
+        console.log('[CDC Import] Total records:', cdcInfo.seaServiceRecords.length);
 
-          // Helper to find value by partial key match
+        const importedRecords: SeaServiceRecord[] = cdcInfo.seaServiceRecords.map((row: Record<string, string>, idx: number) => {
+          // Log every row for debugging
+          console.log(`[CDC Import] Row ${idx}:`, JSON.stringify(row));
+
+          // Build a normalized lookup: lowercase key -> value
+          const lk: Record<string, string> = {};
+          Object.entries(row).forEach(([k, v]) => { lk[k.toLowerCase().trim()] = v; });
+
+          // Helper: find value by any partial key match (case-insensitive)
           const findVal = (...patterns: string[]): string => {
             for (const p of patterns) {
               for (const [k, v] of Object.entries(lk)) {
-                if (k.includes(p) && v) return v;
+                if (k.includes(p.toLowerCase()) && v && v.trim()) return v.trim();
               }
             }
             return '';
           };
 
-          // Parse dates: they may come in formats like dd-mm-yyyy, dd/mm/yyyy, yyyy-mm-dd
+          // Parse dates from various formats
           const parseDate = (raw: string): string => {
             if (!raw) return '';
-            // Already ISO
-            if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
-            // dd-mm-yyyy or dd/mm/yyyy
-            const parts = raw.split(/[-\/\.]/);
+            const cleaned = raw.trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) return cleaned;
+            // dd-mm-yyyy, dd/mm/yyyy, dd.mm.yyyy
+            const parts = cleaned.split(/[-\/\.]/);
             if (parts.length === 3) {
-              const [a, b, c] = parts;
-              // If first part is 4 digits: yyyy-mm-dd
+              const [a, b, c] = parts.map(s => s.trim());
               if (a.length === 4) return `${a}-${b.padStart(2, '0')}-${c.padStart(2, '0')}`;
-              // If last part is 4 digits: dd-mm-yyyy
               if (c.length === 4) return `${c}-${b.padStart(2, '0')}-${a.padStart(2, '0')}`;
             }
-            return raw;
+            // Try Date.parse as last resort
+            const d = new Date(cleaned);
+            if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+            return cleaned;
           };
 
-          const vesselName = findVal('ship', 'vessel') || findVal('name') || `Vessel ${idx + 1}`;
-          const rank = findVal('rank', 'capacity', 'designation') || '';
-          const signOnDate = parseDate(findVal('sign on', 'joining', 'join date', 'sign-on', 'sign_on', 'from'));
-          const signOffDate = parseDate(findVal('sign off', 'leaving', 'leave date', 'sign-off', 'sign_off', 'to'));
-          const imoNumber = findVal('imo') || '';
-          const shipType = findVal('type', 'ship type', 'vessel type') || '';
+          // Try MANY possible header variations
+          const vesselName = findVal('ship', 'vessel', 'ship name', 'vessel name')
+            || findVal('name')
+            || Object.values(row)[0] // Fallback: first column is often ship name
+            || `Vessel ${idx + 1}`;
+
+          const rank = findVal('rank', 'capacity', 'designation', 'engaged as', 'position');
+
+          // Dates - try many variations including col_ fallback positions
+          const signOnDate = parseDate(
+            findVal('sign on', 'sign-on', 'sign_on', 'joining', 'join', 'from', 'embark', 'engagement', 'on date', 'signon')
+          );
+          const signOffDate = parseDate(
+            findVal('sign off', 'sign-off', 'sign_off', 'leaving', 'leave', 'to date', 'disembark', 'discharge', 'off date', 'signoff', 'relieved')
+          );
+
+          const imoNumber = findVal('imo', 'imo no', 'imo number', 'i.m.o');
+          const shipType = findVal('type', 'ship type', 'vessel type');
 
           return {
             id: `cdc_import_${Date.now()}_${idx}`,
