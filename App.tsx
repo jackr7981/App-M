@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { AppView, Department, Rank, User, UserProfile, SeaServiceRecord, ShipType } from './types';
+import { AppView, Department, Rank, User, UserProfile, SeaServiceRecord, ShipType, Institution } from './types';
 import { Logo } from './components/Logo';
 import { Dashboard } from './components/Dashboard';
 import { AdminDashboard } from './components/AdminDashboard'; // Import Admin Dashboard
-import { ArrowRight, Mail, Lock, Upload, Calendar, Phone, CheckCircle, User as UserIcon, Loader2, Search, Globe, RefreshCw, ShieldCheck, X, AlertTriangle, WifiOff, Ship, HelpCircle, ArrowLeft, Anchor } from 'lucide-react';
+import { ArrowRight, Mail, Lock, Upload, Calendar, Phone, CheckCircle, User as UserIcon, Loader2, Search, Globe, RefreshCw, ShieldCheck, X, AlertTriangle, WifiOff, Ship, HelpCircle, ArrowLeft, Anchor, School } from 'lucide-react';
 import { supabase, getStorageUrl, isMockMode, isConfigured } from './services/supabase';
 import { formatDate } from './utils/format';
 import { SessionTracker } from './components/SessionTracker';
@@ -359,6 +359,8 @@ const App: React.FC = () => {
         mobile_number: profileData.mobileNumber,
         date_of_birth: profileData.dateOfBirth,
         preferred_ship_type: profileData.preferredShipType,
+        institution: profileData.institution,
+        batch: profileData.batch,
         ...(profilePicPath && { profile_picture_url: profilePicPath })
       };
 
@@ -1015,6 +1017,28 @@ const App: React.FC = () => {
                       <span className="hidden sm:inline">Import</span>
                     </button>
                   )}
+                </div>
+
+                {/* Education Group */}
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6">
+                  <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center"><School className="w-4 h-4 mr-2 text-blue-600" /> Education & Training</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {renderSelect(
+                      "Maritime Institute",
+                      profileData.institution || '',
+                      (v) => setProfileData({ ...profileData, institution: v }),
+                      Object.values(Institution)
+                    )}
+                    {profileData.institution !== Institution.DIRECT && (
+                      renderInput(
+                        "Batch Number",
+                        profileData.batch || '',
+                        (v) => setProfileData({ ...profileData, batch: v }),
+                        "text",
+                        "e.g. 53"
+                      )
+                    )}
+                  </div>
                 </div>
               </div>
 

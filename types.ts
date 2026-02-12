@@ -100,6 +100,7 @@ export enum Institution {
   BMFA = 'Bangladesh Marine Fisheries Academy',
   DIRECT = 'Direct Entry',
   PRIVATE = 'Private Academy',
+  NMI = 'National Maritime Institute',
   OTHER = 'Other'
 }
 
@@ -118,6 +119,7 @@ export interface UserProfile {
   isOnboard?: boolean; // New field: true = At Sea, false = At Home
   totalUsageMinutes?: number; // Total time spent in app
   institution?: Institution | string;
+  batch?: string;
 }
 
 export interface User {

@@ -36,6 +36,7 @@ export const AlumniAssociation: React.FC = () => {
     const tabs = [
         { id: Institution.BMA, label: 'BMA', icon: Anchor, fullName: 'Bangladesh Marine Academy' },
         { id: Institution.BMFA, label: 'BMFA', icon: School, fullName: 'Marine Fisheries Academy' },
+        { id: Institution.NMI, label: 'NMI', icon: Anchor, fullName: 'National Maritime Institute' },
         { id: Institution.DIRECT, label: 'Direct Entry', icon: Users, fullName: 'Direct Entry Officers' },
         { id: Institution.PRIVATE, label: 'Private', icon: GraduationCap, fullName: 'Private Academies' },
     ];
@@ -57,8 +58,8 @@ export const AlumniAssociation: React.FC = () => {
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
                             className={`flex items-center px-4 py-3 rounded-xl border transition-all whitespace-nowrap ${activeTab === tab.id
-                                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-md'
-                                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-md'
+                                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                                 }`}
                         >
                             <tab.icon className="w-4 h-4 mr-2" />
@@ -114,6 +115,7 @@ export const AlumniAssociation: React.FC = () => {
                                 <div>
                                     <h3 className="font-bold text-slate-800">{user.firstName} {user.lastName}</h3>
                                     <p className="text-xs font-semibold text-emerald-600 uppercase">{user.rank || 'Mariner'}</p>
+                                    {user.batch && <p className="text-xs text-slate-500">Batch: {user.batch}</p>}
                                     <p className="text-xs text-slate-500 mt-1 flex items-center">
                                         {user.isOnboard ? <span className="w-2 h-2 bg-blue-500 rounded-full mr-1.5"></span> : <span className="w-2 h-2 bg-slate-300 rounded-full mr-1.5"></span>}
                                         {user.isOnboard ? 'Onboard' : 'On Leave'}
