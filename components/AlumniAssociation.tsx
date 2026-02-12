@@ -108,7 +108,7 @@ export const AlumniAssociation: React.FC = () => {
                                         <img src={user.profilePicture} alt="" className="w-full h-full object-cover" />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold text-xl">
-                                            {user.firstName[0]}{user.lastName[0]}
+                                            {(user.firstName || '?').charAt(0)}{(user.lastName || '').charAt(0)}
                                         </div>
                                     )}
                                 </div>
