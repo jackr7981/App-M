@@ -4,7 +4,7 @@ export async function parseJobText(text: string, apiKey: string) {
     }
 
     const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
         {
             method: "POST",
             headers: {
@@ -31,6 +31,7 @@ export async function parseJobText(text: string, apiKey: string) {
     const data = await response.json();
 
     if (!data.candidates || data.candidates.length === 0) {
+        console.error("Gemini Response Error:", JSON.stringify(data));
         throw new Error("No response from Gemini");
     }
 
