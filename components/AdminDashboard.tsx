@@ -191,6 +191,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
             .select('*')
             .order('created_at', { ascending: false });
 
+        if (error) console.error("Error fetching jobs:", error);
+        console.log("Jobs data:", data);
+
         if (data) {
             const mappedJobs: JobPosting[] = data.map((item: any) => ({
                 id: item.id,
@@ -232,7 +235,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         try {
             const parsed = await parseJobPosting(importText);
             const { error } = await supabase.from('job_postings').insert({
-                source: 'Manual',
+                source: 'manual',
                 raw_content: importText,
                 parsed_content: parsed,
                 status: 'approved'
@@ -373,8 +376,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     }
 
     return (
-        <div className="min-h-screen bg-slate-100 flex flex-col">
-            {/* Admin Header */}
+        <div className="flex h-screen bg-slate-50 overscroll-none">
+            {/* Header */}
             <header className="bg-slate-900 text-white p-4 shadow-lg sticky top-0 z-50">
                 <div className="container mx-auto flex justify-between items-center">
                     <div className="flex items-center gap-2">

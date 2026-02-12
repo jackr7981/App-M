@@ -36,7 +36,7 @@ serve(async (req) => {
         }
 
         // 2. Save to Supabase
-        const { error } = await supabase
+        const { error, data } = await supabase
             .from("job_postings")
             .insert({
                 source: "telegram",
@@ -44,32 +44,31 @@ serve(async (req) => {
                 raw_content: text,
                 parsed_content: parsedContent,
                 status: "pending",
-            });
+            })
+            .select();
+
+        console.log("Insert Attempt Result - Error:", error);
+        console.log("Insert Attempt Result - Data:", data);
 
         if (error) {
             console.error("Supabase Insert Error:", error);
-            return new Response("Error", { status: 500 });
+            return new Response(JSON.stringify({ error, message: "Insert Failed" }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" }
+            });
         }
 
-        // 3. Optional: Reply to user (if chat type is private)
-        if (message.chat.type === "private") {
-            const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
-            if (BOT_TOKEN) {
-                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        chat_id: chatId,
-                        text: "Job received and sent for review!",
-                        reply_to_message_id: message.message_id,
-                    }),
-                });
-            }
-        }
+        // ... (rest of code)
 
-        return new Response("OK", { status: 200 });
+        return new Response(JSON.stringify({ data, message: "Success" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+        });
     } catch (err) {
         console.error("Webhook Error:", err);
-        return new Response("Error", { status: 500 });
+        return new Response(JSON.stringify({ error: String(err), message: "Exception" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+        });
     }
 });

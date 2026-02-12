@@ -27,7 +27,7 @@ curl -i -X POST "$FUNCTION_URL" \
         "type": "private"
       },
       "date": 1678886000,
-      "text": "URGENT: Master needed for Oil Tanker. Salary $12,000. Join immediately. Contact: crew@example.com"
+      "text": "NEW JOB TEST 777: Chief Engineer needed. Salary $15,000. Apply now."
     }
   }'
 
