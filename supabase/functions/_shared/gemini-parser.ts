@@ -4,7 +4,7 @@ export async function parseJobText(text: string, apiKey: string) {
     }
 
     const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
         {
             method: "POST",
             headers: {
@@ -57,6 +57,7 @@ JSON Response:`
                     topK: 1,
                     topP: 0.95,
                     maxOutputTokens: 1024,
+                    responseMimeType: "application/json",
                 },
             }),
         }
