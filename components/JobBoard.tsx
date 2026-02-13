@@ -78,13 +78,18 @@ export const JobBoard: React.FC<JobBoardProps> = ({ userProfile }) => {
               id: item.id,
               rank: (parsed.rank as Rank) || Rank.OTHER,
               shipType: (parsed.shipType as ShipType) || ShipType.OTHER,
-              wage: parsed.wage || 'Negotiable',
-              joiningDate: parsed.joiningDate || 'ASAP',
+              wage: parsed.salary || parsed.wage || 'Negotiable',
+              joiningDate: parsed.joining_date || parsed.joiningDate || 'ASAP',
               description: parsed.description || item.raw_content,
-              contactInfo: parsed.contactInfo || parsed.contact || 'N/A', // handling both keys
+              contactInfo: parsed.contact || parsed.contactInfo || 'N/A',
               source: item.source,
               postedDate: new Date(item.created_at).getTime(),
-              companyName: parsed.company || parsed.companyName || 'Unknown'
+              companyName: parsed.agency || parsed.company || parsed.companyName || 'Unknown',
+              // New SHIPPED format fields
+              mlaNumber: parsed.mla_number || 'N/A',
+              agencyAddress: parsed.address || 'N/A',
+              mobile: parsed.mobile || parsed.contactInfo || 'N/A',
+              email: parsed.email || 'N/A'
             };
           });
           setJobs(mappedJobs);
@@ -130,13 +135,18 @@ export const JobBoard: React.FC<JobBoardProps> = ({ userProfile }) => {
         id: Date.now().toString(),
         rank: (parsedData.rank as Rank) || Rank.OTHER,
         shipType: (parsedData.shipType as ShipType) || ShipType.OTHER,
-        wage: parsedData.wage || "Negotiable",
-        joiningDate: parsedData.joiningDate || "ASAP",
+        wage: parsedData.wage || parsedData.salary || "Negotiable",
+        joiningDate: parsedData.joiningDate || parsedData.joining_date || "ASAP",
         description: parsedData.description || importText,
-        contactInfo: parsedData.contactInfo || "N/A",
+        contactInfo: parsedData.contactInfo || parsedData.contact || "N/A",
         source: 'Manual',
         postedDate: Date.now(),
-        companyName: parsedData.companyName || "Unknown Agency"
+        companyName: parsedData.companyName || parsedData.agency || "Unknown Agency",
+        // New SHIPPED format fields
+        mlaNumber: parsedData.mla_number || 'N/A',
+        agencyAddress: parsedData.address || 'N/A',
+        mobile: parsedData.mobile || 'N/A',
+        email: parsedData.email || 'N/A'
       };
 
       setJobs(prev => [newJob, ...prev]);
@@ -269,22 +279,81 @@ export const JobBoard: React.FC<JobBoardProps> = ({ userProfile }) => {
                 <p className="line-clamp-3">{job.description}</p>
               </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                <div className="text-xs text-slate-500 font-mono truncate max-w-[50%] bg-slate-100 px-2 py-1 rounded">
-                  {job.contactInfo}
+              {/* MLA Number & Address */}
+              {(job.mlaNumber && job.mlaNumber !== 'N/A') || (job.agencyAddress && job.agencyAddress !== 'N/A') ? (
+                <div className="grid grid-cols-1 gap-2 mb-3">
+                  {job.mlaNumber && job.mlaNumber !== 'N/A' && (
+                    <div className="bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+                      <span className="text-[10px] text-amber-600 uppercase font-bold block mb-0.5">MLA Number</span>
+                      <div className="text-amber-900 font-semibold text-xs">{job.mlaNumber}</div>
+                    </div>
+                  )}
+                  {job.agencyAddress && job.agencyAddress !== 'N/A' && (
+                    <div className="bg-purple-50 px-3 py-2 rounded-lg border border-purple-200">
+                      <span className="text-[10px] text-purple-600 uppercase font-bold block mb-0.5">Agency Address</span>
+                      <div className="text-purple-900 font-medium text-xs flex items-start">
+                        <MapPin className="w-3 h-3 mr-1 mt-0.5 flex-shrink-0" />
+                        <span className="line-clamp-2">{job.agencyAddress}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="flex gap-2">
-                  <a href={`tel:${job.contactInfo.match(/[\d+]+/)}`} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors">
-                    <Phone className="w-4 h-4" />
-                  </a>
-                  <button
-                    onClick={() => navigator.clipboard.writeText(job.contactInfo)}
-                    className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
-                    title="Copy Contact"
-                  >
-                    <Copy className="w-4 h-4" />
-                  </button>
-                </div>
+              ) : null}
+
+              {/* Contact Information with Interactive Buttons */}
+              <div className="pt-2 border-t border-slate-100 space-y-2">
+                {/* Mobile Number with Call Button */}
+                {job.mobile && job.mobile !== 'N/A' && (
+                  <div className="flex items-center justify-between bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
+                    <div className="flex items-center flex-1 min-w-0">
+                      <Phone className="w-4 h-4 text-blue-600 mr-2 flex-shrink-0" />
+                      <span className="text-xs text-blue-900 font-mono truncate">{job.mobile}</span>
+                    </div>
+                    <a
+                      href={`tel:${job.mobile.replace(/[^0-9+]/g, '')}`}
+                      className="ml-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-bold flex items-center gap-1 flex-shrink-0"
+                    >
+                      <Phone className="w-3 h-3" /> Call
+                    </a>
+                  </div>
+                )}
+
+                {/* Email with Send Button */}
+                {job.email && job.email !== 'N/A' && (
+                  <div className="flex items-center justify-between bg-green-50 px-3 py-2 rounded-lg border border-green-200">
+                    <div className="flex items-center flex-1 min-w-0">
+                      <Mail className="w-4 h-4 text-green-600 mr-2 flex-shrink-0" />
+                      <span className="text-xs text-green-900 font-mono truncate">{job.email}</span>
+                    </div>
+                    <a
+                      href={`mailto:${job.email}`}
+                      className="ml-2 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs font-bold flex items-center gap-1 flex-shrink-0"
+                    >
+                      <Mail className="w-3 h-3" /> Email
+                    </a>
+                  </div>
+                )}
+
+                {/* Fallback to legacy contactInfo if new fields are not available */}
+                {(!job.mobile || job.mobile === 'N/A') && (!job.email || job.email === 'N/A') && job.contactInfo && job.contactInfo !== 'N/A' && (
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-slate-500 font-mono truncate max-w-[50%] bg-slate-100 px-2 py-1 rounded">
+                      {job.contactInfo}
+                    </div>
+                    <div className="flex gap-2">
+                      <a href={`tel:${job.contactInfo.match(/[\d+]+/)}`} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors">
+                        <Phone className="w-4 h-4" />
+                      </a>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(job.contactInfo)}
+                        className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
+                        title="Copy Contact"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ))

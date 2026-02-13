@@ -25,17 +25,43 @@ serve(async (req) => {
             return new Response("Error", { status: 500 });
         }
 
-        // 1. Parse content with AI
-        let parsedContent = {};
-        try {
-            parsedContent = await parseJobText(text, GEMINI_API_KEY);
-        } catch (err) {
-            console.error("AI Parsing failed:", err);
-            // We still save the job, but with empty parsed content or status 'failed'?
-            // Plan says status 'pending'. Parsed content can be empty or partial.
+        // 1. Check for duplicates - avoid processing the same message twice
+        const { data: existingJob, error: checkError } = await supabase
+            .from("job_postings")
+            .select("id")
+            .eq("source", "telegram")
+            .eq("source_id", messageId)
+            .maybeSingle();
+
+        if (existingJob) {
+            console.log("Duplicate message detected, skipping:", messageId);
+            return new Response(JSON.stringify({ message: "Duplicate message, already processed" }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
         }
 
-        // 2. Save to Supabase
+        // 2. Parse content with AI
+        let parsedContent = {};
+        let parsingStatus = "pending"; // Default status
+        try {
+            parsedContent = await parseJobText(text, GEMINI_API_KEY);
+
+            // Validate that essential fields were extracted
+            const hasEssentialFields = parsedContent.rank && parsedContent.agency;
+            if (hasEssentialFields) {
+                parsingStatus = "pending"; // Ready for admin review
+            } else {
+                console.warn("Parsing incomplete - missing essential fields (rank or agency)");
+                parsingStatus = "pending"; // Still pending, but admin will review
+            }
+        } catch (err) {
+            console.error("AI Parsing failed:", err);
+            // We still save the job with raw content for manual review
+            parsingStatus = "pending";
+        }
+
+        // 3. Save to Supabase
         const { error, data } = await supabase
             .from("job_postings")
             .insert({
@@ -43,7 +69,7 @@ serve(async (req) => {
                 source_id: messageId,
                 raw_content: text,
                 parsed_content: parsedContent,
-                status: "pending",
+                status: parsingStatus,
             })
             .select();
 

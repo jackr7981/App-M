@@ -175,10 +175,15 @@ export interface JobPosting {
   wage?: string;
   joiningDate?: string;
   description: string;
-  contactInfo: string; // Phone or Email
+  contactInfo: string; // Phone or Email (legacy, kept for backwards compatibility)
   source: 'WhatsApp' | 'Telegram' | 'Facebook' | 'Manual' | 'Direct' | 'Other';
   postedDate: number;
   companyName?: string;
+  // New SHIPPED format fields
+  mlaNumber?: string; // Manning License Agreement number
+  agencyAddress?: string; // Physical address of the agency
+  mobile?: string; // Phone number (separate from email)
+  email?: string; // Email address (separate from phone)
 }
 
 // Forum Types
