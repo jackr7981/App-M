@@ -57,7 +57,6 @@ JSON Response:`
                     topK: 1,
                     topP: 0.95,
                     maxOutputTokens: 1024,
-                    responseMimeType: "application/json",
                 },
             }),
         }
