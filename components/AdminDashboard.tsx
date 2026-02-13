@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, UserProfile, ShipType, Rank, DocumentCategory, MarinerDocument, Department, JobPosting, Institution } from '../types';
-import { LogOut, Users, FileCheck, Anchor, Search, ChevronRight, ArrowLeft, BarChart, Shield, HardDrive, Database, FileText, Clock, Briefcase, PlusCircle, CheckCircle, XCircle, Sparkles, Loader2, School, Rocket } from 'lucide-react';
+import { LogOut, Users, FileCheck, Anchor, Search, ChevronRight, ArrowLeft, BarChart, Shield, HardDrive, Database, FileText, Clock, Briefcase, PlusCircle, CheckCircle, XCircle, Sparkles, Loader2, School } from 'lucide-react';
 import { parseJobPosting } from '../services/geminiService';
 import { Documents } from './Documents';
-import { DeploymentSetup } from './DeploymentSetup';
 import { supabase, isMockMode } from '../services/supabase';
 
 interface AdminDashboardProps {
@@ -79,7 +78,7 @@ const generateMockDocuments = (userId: string): MarinerDocument[] => {
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     const [users, setUsers] = useState<User[]>([]);
-    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'storage' | 'jobs' | 'deployment'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'storage' | 'jobs'>('overview');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [userDocuments, setUserDocuments] = useState<MarinerDocument[]>([]);
@@ -432,12 +431,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                     >
                         <HardDrive className="w-4 h-4 inline-block mr-2" /> Usage & Storage
                     </button>
-                    <button
-                        onClick={() => setActiveTab('deployment')}
-                        className={`px-6 py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'deployment' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-                    >
-                        <Rocket className="w-4 h-4 inline-block mr-2" /> Deployment
-                    </button>
                 </div>
             </div>
 
@@ -747,17 +740,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                 </div>
                             </div>
                         )}
-                    </div>
-                )}
-
-                {activeTab === 'deployment' && (
-                    <div className="animate-fade-in">
-                        <DeploymentSetup
-                            onComplete={() => {
-                                alert('🎉 Deployment complete! Your Telegram bot is now live and processing job postings.');
-                                setActiveTab('jobs');
-                            }}
-                        />
                     </div>
                 )}
 
