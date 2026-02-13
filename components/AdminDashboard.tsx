@@ -195,25 +195,38 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         console.log("Jobs data:", data);
 
         if (data) {
-            const mappedJobs: JobPosting[] = data.map((item: any) => ({
-                id: item.id,
-                rank: item.parsed_content?.rank || 'Unknown',
-                shipType: item.parsed_content?.shipType || 'Unknown',
-                wage: item.parsed_content?.salary || item.parsed_content?.wage || 'Negotiable',
-                joiningDate: item.parsed_content?.joining_date || item.parsed_content?.joiningDate || 'ASAP',
-                description: item.parsed_content?.description || item.raw_content,
-                contactInfo: item.parsed_content?.contact || item.parsed_content?.contactInfo || 'N/A',
-                source: item.source,
-                postedDate: new Date(item.created_at).getTime(),
-                companyName: item.parsed_content?.agency || item.parsed_content?.companyName || item.parsed_content?.company || 'Unknown',
-                // New SHIPPED format fields
-                mlaNumber: item.parsed_content?.mla_number || 'N/A',
-                agencyAddress: item.parsed_content?.address || 'N/A',
-                mobile: item.parsed_content?.mobile || 'N/A',
-                email: item.parsed_content?.email || 'N/A',
-                // Admin-specific field
-                status: item.status
-            } as JobPosting & { status: string }));
+            const mappedJobs: JobPosting[] = data.map((item: any) => {
+                const parsed = item.parsed_content || {};
+
+                return {
+                    id: item.id,
+                    // Use individual columns first (faster), fallback to parsed_content
+                    rank: item.rank || parsed.rank || 'Unknown',
+                    shipType: parsed.shipType || 'Unknown',
+                    wage: item.salary || parsed.salary || parsed.wage || 'Negotiable',
+                    joiningDate: item.joining_date || parsed.joining_date || parsed.joiningDate || 'ASAP',
+                    description: parsed.description || item.raw_content,
+                    contactInfo: parsed.contact || parsed.contactInfo || 'N/A',
+                    source: item.source,
+                    postedDate: new Date(item.created_at).getTime(),
+                    companyName: item.agency || parsed.agency || parsed.companyName || parsed.company || 'Unknown',
+                    // New SHIPPED format fields
+                    mlaNumber: item.mla_number || parsed.mla_number || 'N/A',
+                    agencyAddress: item.agency_address || parsed.address || 'N/A',
+                    mobile: item.mobile_number || parsed.mobile || 'N/A',
+                    email: item.agency_email || parsed.email || 'N/A',
+                    // Admin-specific tracking fields
+                    status: item.status,
+                    sourceGroupName: item.source_group_name,
+                    parsingAttempts: item.parsing_attempts || 0,
+                    lastParsingError: item.last_parsing_error
+                } as JobPosting & {
+                    status: string;
+                    sourceGroupName?: string;
+                    parsingAttempts?: number;
+                    lastParsingError?: string;
+                };
+            });
             setJobs(mappedJobs);
         }
         setJobsLoading(false);
