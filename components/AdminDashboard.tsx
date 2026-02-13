@@ -199,18 +199,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                 id: item.id,
                 rank: item.parsed_content?.rank || 'Unknown',
                 shipType: item.parsed_content?.shipType || 'Unknown',
-                wage: item.parsed_content?.wage,
-                joiningDate: item.parsed_content?.joiningDate,
+                wage: item.parsed_content?.salary || item.parsed_content?.wage || 'Negotiable',
+                joiningDate: item.parsed_content?.joining_date || item.parsed_content?.joiningDate || 'ASAP',
                 description: item.parsed_content?.description || item.raw_content,
-                contactInfo: item.parsed_content?.contactInfo || item.parsed_content?.contact || 'N/A',
+                contactInfo: item.parsed_content?.contact || item.parsed_content?.contactInfo || 'N/A',
                 source: item.source,
                 postedDate: new Date(item.created_at).getTime(),
-                companyName: item.parsed_content?.companyName || item.parsed_content?.company,
-                // We need to store status in JobPosting to show it in UI? 
-                // JobPosting interface in types.ts doesn't have status. 
-                // I should add it to types.ts or just handle it locally.
-                // For Admin, status is crucial.
-                // I'll alias it or extend the type locally.
+                companyName: item.parsed_content?.agency || item.parsed_content?.companyName || item.parsed_content?.company || 'Unknown',
+                // New SHIPPED format fields
+                mlaNumber: item.parsed_content?.mla_number || 'N/A',
+                agencyAddress: item.parsed_content?.address || 'N/A',
+                mobile: item.parsed_content?.mobile || 'N/A',
+                email: item.parsed_content?.email || 'N/A',
+                // Admin-specific field
                 status: item.status
             } as JobPosting & { status: string }));
             setJobs(mappedJobs);
@@ -672,8 +673,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                         <div className="mt-2 text-sm text-slate-600 bg-slate-50 p-2 rounded border border-slate-100">
                                             {job.description}
                                         </div>
-                                        <div className="mt-2 text-xs text-slate-500 font-mono">
-                                            Contact: {job.contactInfo}
+                                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                                            {job.mlaNumber && job.mlaNumber !== 'N/A' && (
+                                                <div className="bg-amber-50 p-2 rounded border border-amber-200">
+                                                    <span className="text-amber-600 font-bold block">MLA Number</span>
+                                                    <span className="text-amber-900">{job.mlaNumber}</span>
+                                                </div>
+                                            )}
+                                            {job.agencyAddress && job.agencyAddress !== 'N/A' && (
+                                                <div className="bg-purple-50 p-2 rounded border border-purple-200 col-span-2">
+                                                    <span className="text-purple-600 font-bold block">Address</span>
+                                                    <span className="text-purple-900">{job.agencyAddress}</span>
+                                                </div>
+                                            )}
+                                            {job.mobile && job.mobile !== 'N/A' && (
+                                                <div className="bg-blue-50 p-2 rounded border border-blue-200">
+                                                    <span className="text-blue-600 font-bold block">Mobile</span>
+                                                    <span className="text-blue-900 font-mono">{job.mobile}</span>
+                                                </div>
+                                            )}
+                                            {job.email && job.email !== 'N/A' && (
+                                                <div className="bg-green-50 p-2 rounded border border-green-200">
+                                                    <span className="text-green-600 font-bold block">Email</span>
+                                                    <span className="text-green-900 font-mono truncate block">{job.email}</span>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 ))
