@@ -68,17 +68,18 @@ function isLikelyJobPosting(content: string): boolean {
 
 serve(async (req) => {
     try {
-        // 1. Verify webhook secret for security
-        if (webhookSecret) {
-            const authHeader = req.headers.get("X-Telegram-Bot-Api-Secret-Token");
-            if (authHeader !== webhookSecret) {
-                console.warn("Unauthorized webhook attempt - invalid secret token");
-                return new Response(JSON.stringify({ error: "Unauthorized" }), {
-                    status: 401,
-                    headers: { "Content-Type": "application/json" },
-                });
-            }
-        }
+        // 1. Verify webhook secret for security (DISABLED for now)
+        // TODO: Re-enable after setting up webhook secret properly
+        // if (webhookSecret) {
+        //     const authHeader = req.headers.get("X-Telegram-Bot-Api-Secret-Token");
+        //     if (authHeader !== webhookSecret) {
+        //         console.warn("Unauthorized webhook attempt - invalid secret token");
+        //         return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        //             status: 401,
+        //             headers: { "Content-Type": "application/json" },
+        //         });
+        //     }
+        // }
 
         const update: TelegramUpdate = await req.json();
 
