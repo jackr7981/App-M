@@ -4,7 +4,7 @@ export async function parseJobText(text: string, apiKey: string) {
     }
 
     const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
         {
             method: "POST",
             headers: {
@@ -83,11 +83,9 @@ JSON Response:`
 
     const resultText = data.candidates[0].content.parts[0].text;
 
-    // Clean up markdown code blocks if present
-    const cleanText = resultText.replace(/```json/g, "").replace(/```/g, "").trim();
-
     try {
-        const parsed = JSON.parse(cleanText);
+        // With responseMimeType: "application/json", resultText is already raw JSON
+        const parsed = JSON.parse(resultText);
 
         // Validate that all required fields exist
         const requiredFields = ['rank', 'salary', 'joining_date', 'agency', 'mla_number', 'address', 'mobile', 'email'];
