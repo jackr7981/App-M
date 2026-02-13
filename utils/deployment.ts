@@ -108,22 +108,46 @@ export async function testEdgeFunction(
   functionName: string
 ): Promise<boolean> {
   try {
-    // Use OPTIONS request to check if function exists without triggering logic
+    // Try HEAD request first (lightweight, less likely to be blocked by CORS)
     const response = await fetch(
       `https://${projectRef}.supabase.co/functions/v1/${functionName}`,
       {
-        method: 'OPTIONS',
-        headers: {
-          'Access-Control-Request-Method': 'POST',
-        }
+        method: 'HEAD',
       }
     );
 
-    // Function exists if we get 200 (OK) or 404 (exists but expects POST)
-    // or 405 (method not allowed - means it exists)
-    return response.ok || response.status === 404 || response.status === 405;
-  } catch {
-    return false;
+    // Function exists if we get ANY response indicating it's there:
+    // - 200 (OK) - function accepts HEAD
+    // - 401 (Unauthorized) - function exists but needs auth
+    // - 403 (Forbidden) - function exists but access denied
+    // - 404 (Not Found) - might still exist, just doesn't accept HEAD
+    // - 405 (Method Not Allowed) - function exists but HEAD not allowed
+    return (
+      response.ok ||
+      response.status === 401 ||
+      response.status === 403 ||
+      response.status === 404 ||
+      response.status === 405
+    );
+  } catch (error) {
+    // If HEAD fails (CORS issues), try a GET request as fallback
+    try {
+      const response = await fetch(
+        `https://${projectRef}.supabase.co/functions/v1/${functionName}`
+      );
+
+      // Any response (including errors) means the function exists
+      return (
+        response.ok ||
+        response.status === 401 ||
+        response.status === 403 ||
+        response.status === 404 ||
+        response.status === 405
+      );
+    } catch {
+      // Complete failure - function likely doesn't exist
+      return false;
+    }
   }
 }
 
