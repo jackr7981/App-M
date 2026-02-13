@@ -1,21 +1,23 @@
 export async function parseJobText(text: string, apiKey: string) {
     if (!apiKey) {
-        throw new Error("GEMINI_API_KEY is not set");
+        throw new Error("ANTHROPIC_API_KEY is not set");
     }
 
-    const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-        {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                contents: [
-                    {
-                        parts: [
-                            {
-                                text: `You are an expert at parsing maritime job postings from Telegram/WhatsApp groups into the SHIPPED format.
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+            model: "claude-opus-4-6",
+            max_tokens: 2048,
+            temperature: 0,
+            messages: [
+                {
+                    role: "user",
+                    content: `You are an expert at parsing maritime job postings from Telegram/WhatsApp groups into the SHIPPED format.
 
 Extract the following 8 required fields from this job posting text:
 
@@ -47,30 +49,26 @@ IMPORTANT RULES:
 
 Return ONLY a valid JSON object with these exact keys: rank, salary, joining_date, agency, mla_number, address, mobile, email
 
-JSON Response:`
-                            },
-                        ],
-                    },
-                ],
-                generationConfig: {
-                    temperature: 0.1,
-                    topK: 1,
-                    topP: 0.95,
-                    maxOutputTokens: 1024,
-                    responseMimeType: "application/json",
+Do not include any markdown formatting or code blocks - just return the raw JSON.`,
                 },
-            }),
-        }
-    );
+            ],
+        }),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Claude API Error:", JSON.stringify(errorData));
+        throw new Error(`Claude API request failed: ${response.status}`);
+    }
 
     const data = await response.json();
 
-    if (!data.candidates || data.candidates.length === 0) {
-        console.error("Gemini Response Error:", JSON.stringify(data));
-        throw new Error("No response from Gemini");
+    if (!data.content || data.content.length === 0) {
+        console.error("Claude Response Error:", JSON.stringify(data));
+        throw new Error("No response from Claude");
     }
 
-    const resultText = data.candidates[0].content.parts[0].text;
+    const resultText = data.content[0].text;
 
     // Clean up markdown code blocks if present
     const cleanText = resultText.replace(/```json/g, "").replace(/```/g, "").trim();
@@ -79,20 +77,29 @@ JSON Response:`
         const parsed = JSON.parse(cleanText);
 
         // Validate that all required fields exist
-        const requiredFields = ['rank', 'salary', 'joining_date', 'agency', 'mla_number', 'address', 'mobile', 'email'];
-        const missingFields = requiredFields.filter(field => !(field in parsed));
+        const requiredFields = [
+            "rank",
+            "salary",
+            "joining_date",
+            "agency",
+            "mla_number",
+            "address",
+            "mobile",
+            "email",
+        ];
+        const missingFields = requiredFields.filter((field) => !(field in parsed));
 
         if (missingFields.length > 0) {
-            console.warn(`Missing fields in parsed response: ${missingFields.join(', ')}`);
+            console.warn(`Missing fields in parsed response: ${missingFields.join(", ")}`);
             // Fill in missing fields with N/A
-            missingFields.forEach(field => {
-                parsed[field] = 'N/A';
+            missingFields.forEach((field) => {
+                parsed[field] = "N/A";
             });
         }
 
         return parsed;
     } catch (e) {
-        console.error("Failed to parse Gemini response:", resultText);
+        console.error("Failed to parse Claude response:", resultText);
         throw new Error("Failed to parse AI response as JSON");
     }
 }
