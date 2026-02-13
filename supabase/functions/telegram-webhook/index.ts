@@ -98,20 +98,26 @@ serve(async (req) => {
         // }
 
         const update: TelegramUpdate = await req.json();
+        console.log("📩 Received update:", JSON.stringify(update, null, 2));
 
         // 2. Handle both new messages and edited messages
         const message = update.message || update.edited_message;
 
         if (!message) {
+            console.log("⏭️  Skipped: No message in update");
             return new Response(JSON.stringify({ ok: true, skipped: "no_message" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" },
             });
         }
 
+        console.log("💬 Message chat type:", message.chat.type);
+        console.log("📝 Message text preview:", (message.text || message.caption || "").substring(0, 100));
+
         // 3. Only process group messages
         if (message.chat.type !== "group" && message.chat.type !== "supergroup") {
-            return new Response(JSON.stringify({ ok: true, skipped: "not_group" }), {
+            console.log("⏭️  Skipped: Not a group message (type:", message.chat.type, ")");
+            return new Response(JSON.stringify({ ok: true, skipped: "not_group", chat_type: message.chat.type }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" },
             });
@@ -121,12 +127,18 @@ serve(async (req) => {
         const text = message.text || message.caption || "";
 
         // 5. Filter: Only process messages that look like job postings
-        if (!isLikelyJobPosting(text)) {
-            return new Response(JSON.stringify({ ok: true, skipped: "not_job_posting" }), {
+        const isJobPosting = isLikelyJobPosting(text);
+        console.log("🔍 Is job posting:", isJobPosting, "- Text length:", text.length);
+
+        if (!isJobPosting) {
+            console.log("⏭️  Skipped: Not a job posting");
+            return new Response(JSON.stringify({ ok: true, skipped: "not_job_posting", text_length: text.length }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" },
             });
         }
+
+        console.log("✅ Processing job posting...");
 
         // 6. Create unique source_id combining chat and message ID
         const sourceId = `tg_${message.chat.id}_${message.message_id}`;

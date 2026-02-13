@@ -4,7 +4,7 @@ export async function parseJobText(text: string, apiKey: string) {
     }
 
     const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
         {
             method: "POST",
             headers: {
@@ -65,6 +65,17 @@ JSON Response:`
 
     const data = await response.json();
 
+    // Check for API errors
+    if (data.error) {
+        console.error("Gemini API Error:", JSON.stringify(data.error));
+        throw new Error(`Gemini API Error: ${data.error.message || JSON.stringify(data.error)}`);
+    }
+
+    if (!response.ok) {
+        console.error("Gemini HTTP Error:", response.status, JSON.stringify(data));
+        throw new Error(`Gemini API request failed: ${response.status}`);
+    }
+
     if (!data.candidates || data.candidates.length === 0) {
         console.error("Gemini Response Error:", JSON.stringify(data));
         throw new Error("No response from Gemini");
@@ -72,11 +83,9 @@ JSON Response:`
 
     const resultText = data.candidates[0].content.parts[0].text;
 
-    // Clean up markdown code blocks if present
-    const cleanText = resultText.replace(/```json/g, "").replace(/```/g, "").trim();
-
     try {
-        const parsed = JSON.parse(cleanText);
+        // With responseMimeType: "application/json", resultText is already raw JSON
+        const parsed = JSON.parse(resultText);
 
         // Validate that all required fields exist
         const requiredFields = ['rank', 'salary', 'joining_date', 'agency', 'mla_number', 'address', 'mobile', 'email'];
