@@ -68,6 +68,22 @@ function isLikelyJobPosting(content: string): boolean {
 
 serve(async (req) => {
     try {
+        console.log("🚀 Webhook called - Version: 2.0 (Auth disabled)");
+        console.log("Method:", req.method);
+        console.log("Headers:", Object.fromEntries(req.headers.entries()));
+
+        // Handle GET requests for testing
+        if (req.method === "GET") {
+            return new Response(JSON.stringify({
+                status: "ok",
+                version: "2.0-auth-disabled",
+                message: "Webhook is running - send POST requests with Telegram updates"
+            }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+            });
+        }
+
         // 1. Verify webhook secret for security (DISABLED for now)
         // TODO: Re-enable after setting up webhook secret properly
         // if (webhookSecret) {
