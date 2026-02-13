@@ -57,12 +57,20 @@ Select: DISABLED
 
 ### 2.1 Run Enhanced Schema Migration
 
-Execute the migration SQL in Supabase SQL Editor:
+**Steps to execute the migration:**
 
+1. Open the migration file: `supabase/migrations/002_enhanced_job_postings.sql`
+2. Copy the **ENTIRE CONTENTS** of the SQL file (all 179 lines)
+3. Go to Supabase Dashboard → SQL Editor → New Query
+4. Paste the SQL contents into the editor
+5. Click "Run" (or press Ctrl+Enter)
+
+**Alternative (if using Supabase CLI):**
 ```bash
-# The migration file is located at:
-supabase/migrations/002_enhanced_job_postings.sql
+supabase db reset  # This will run all migrations in order
 ```
+
+⚠️ **Important:** Do NOT copy bash comments (lines starting with `#`) or file paths into the SQL Editor - only copy the SQL statements from inside the migration file.
 
 This migration adds:
 - ✅ Individual columns for each SHIPPED field (rank, salary, joining_date, etc.)
@@ -320,6 +328,28 @@ SELECT cron.schedule('refresh-active-jobs', '0 3 * * *', 'SELECT refresh_active_
 ---
 
 ## 🔧 Troubleshooting
+
+### Issue: SQL Syntax Error with "#" Character
+
+**Error message:**
+```
+ERROR: 42601: syntax error at or near "#"
+LINE 1: # In Supabase SQL Editor, execute:
+```
+
+**Cause:** You accidentally copied bash comments or file paths from the deployment guide into the SQL Editor instead of copying the actual SQL file contents.
+
+**Solution:**
+1. Open the file `supabase/migrations/002_enhanced_job_postings.sql` in a text editor or VS Code
+2. Select ALL the SQL code (Ctrl+A or Cmd+A) - this is 179 lines
+3. Copy it (Ctrl+C)
+4. Go to Supabase Dashboard → SQL Editor → New Query
+5. Paste the SQL code (Ctrl+V)
+6. Click "Run" button
+
+⚠️ **Important:** PostgreSQL uses `--` for comments, not `#`. Only copy the SQL statements from the migration file itself.
+
+---
 
 ### Issue: Webhook Not Receiving Messages
 
