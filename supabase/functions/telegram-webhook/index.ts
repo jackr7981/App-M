@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { parseJobText } from "../_shared/gemini-parser.ts";
+import { parseJobText } from "../_shared/openai-parser.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -158,9 +158,9 @@ serve(async (req) => {
             });
         }
 
-        const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-        if (!GEMINI_API_KEY) {
-            console.error("GEMINI_API_KEY is not set");
+        const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+        if (!OPENAI_API_KEY) {
+            console.error("OPENAI_API_KEY is not set");
             return new Response("Error", { status: 500 });
         }
 
@@ -168,7 +168,7 @@ serve(async (req) => {
         let parsedContent = {};
         let parsingStatus = "pending";
         try {
-            parsedContent = await parseJobText(text, GEMINI_API_KEY);
+            parsedContent = await parseJobText(text, OPENAI_API_KEY);
 
             // Validate that essential fields were extracted
             const hasEssentialFields = parsedContent.rank && parsedContent.agency;
