@@ -65,31 +65,34 @@ export const JobBoard: React.FC<JobBoardProps> = ({ userProfile }) => {
       if (false) { // Mock mode logic disabled for now to force real DB check, or use isMockMode from services
         setJobs(INITIAL_JOBS);
       } else {
+        // Use individual columns for faster queries (with fallback to parsed_content)
         const { data, error } = await supabase
           .from('job_postings')
           .select('*')
-          .eq('status', 'approved')
+          .in('status', ['approved', 'parsed', 'published'])
           .order('created_at', { ascending: false });
 
         if (data) {
           const mappedJobs: JobPosting[] = data.map((item: any) => {
             const parsed = item.parsed_content || {};
+
+            // Prefer individual columns (faster), fallback to parsed_content JSONB
             return {
               id: item.id,
-              rank: (parsed.rank as Rank) || Rank.OTHER,
+              rank: (item.rank || parsed.rank as Rank) || Rank.OTHER,
               shipType: (parsed.shipType as ShipType) || ShipType.OTHER,
-              wage: parsed.salary || parsed.wage || 'Negotiable',
-              joiningDate: parsed.joining_date || parsed.joiningDate || 'ASAP',
+              wage: item.salary || parsed.salary || parsed.wage || 'Negotiable',
+              joiningDate: item.joining_date || parsed.joining_date || parsed.joiningDate || 'ASAP',
               description: parsed.description || item.raw_content,
               contactInfo: parsed.contact || parsed.contactInfo || 'N/A',
               source: item.source,
               postedDate: new Date(item.created_at).getTime(),
-              companyName: parsed.agency || parsed.company || parsed.companyName || 'Unknown',
-              // New SHIPPED format fields
-              mlaNumber: parsed.mla_number || 'N/A',
-              agencyAddress: parsed.address || 'N/A',
-              mobile: parsed.mobile || parsed.contactInfo || 'N/A',
-              email: parsed.email || 'N/A'
+              companyName: item.agency || parsed.agency || parsed.company || parsed.companyName || 'Unknown',
+              // New SHIPPED format fields - use individual columns first
+              mlaNumber: item.mla_number || parsed.mla_number || 'N/A',
+              agencyAddress: item.agency_address || parsed.address || 'N/A',
+              mobile: item.mobile_number || parsed.mobile || parsed.contactInfo || 'N/A',
+              email: item.agency_email || parsed.email || 'N/A'
             };
           });
           setJobs(mappedJobs);
