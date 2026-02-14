@@ -1,319 +1,207 @@
 {
-  "scraped_at": "2026-02-14T21:55:25.834049",
+  "scraped_at": "2026-02-14T22:25:25.533106",
   "total_jobs": 28,
   "jobs": [
     {
       "title": "Unknown",
-      "raw_content": "Careers at Sea | HOME | CAREERS | CAREERS AT SEA",
-      "rank": "Other",
-      "ship_type": "Other",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "raw_text": "Careers at Sea | HOME | CAREERS | CAREERS AT SEA",
+      "scraped_at": "2026-02-14T22:25:25.528214"
     },
     {
       "title": "SECOND OFF - VLCC",
-      "raw_content": "Careers at Sea | HOME | CAREERS | CAREERS AT SEA | Features Jobs at Sea | View our latest jobs. Also keep an eye on our | LinkedIn | for regular\n                        updates. | SECOND OFF - VLCC | Deadline: By Date | Contract Duration: 8M (+1) | Total Needed: 2 | Salary: $3500 - $4200 | DWT/GRT/TEU: \n                                        160247/-- | View Details | Apply Now | SECOND OFF - Oil/Chem | Minimum requirement: one voyage experience. Ideal for those seeking to expand their maritime career. | Deadline: By Date | Contract Duration: 4M (+1) | Total Needed: 1 | Salary: $3500 - $3800 | DWT/GRT/TEU: \n                                        14460/9127 | View Details | Apply Now | AB - Crude Oil | Deadline: Urgent | Contract Duration: 8M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        105940/57220 | View Details | Apply Now | THIRD ENG - Crude Oil | Deadline: By Date | Contract Duration: 6M (+1) | Total Needed: 3 | Salary: Negotiable | DWT/GRT/TEU: \n                                        105940/57220 | View Details | Apply Now | 4TH ENGINEER - Oil/Chem | Deadline: By Date | Contract Duration: 6M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        29510/50120 | View Details | Apply Now | 4TH ENGINEER - Crude Oil | Deadline: Urgent | Contract Duration: 6M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        105940/57220 | View Details | Apply Now | AB - Oil/Chem | Deadline: By Date | Contract Duration: 8M (+1) | Total Needed: 2 | Salary: Negotiable | DWT/GRT/TEU: \n                                        14460/9127 | View Details | Apply Now | OILER - Oil/Chem | Deadline: By Date | Contract Duration: 8M (+1) | Total Needed: 2 | Salary: Negotiable | DWT/GRT/TEU: \n                                        14460/9127 | View Details | Apply Now | THIRD OFF - Crude Oil | Deadline: Urgent | Contract Duration: 6M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        109900/62900 | View Details | Apply Now | 4TH ENGINEER - VLCC | Deadline: Urgent | Contract Duration: 6M (+1) | Total Needed: 2 | Salary: Negotiable | DWT/GRT/TEU: \n                                        310105/160262 | View Details | Apply Now | THIRD OFF - Oil/Product | Deadline: Urgent | Contract Duration: 6M (+1) | Total Needed: 2 | Salary: Negotiable | DWT/GRT/TEU: \n                                        48700/28780 | View Details | Apply Now | 2ND ENGINEER - Oil/Product | Deadline: By Date | Contract Duration: 4M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        48700/28780 | View Details | Apply Now | FITTER - Crude Oil | Deadline: Urgent | Contract Duration: 8M (+1) | Total Needed: 1 | Salary: $2050 | DWT/GRT/TEU: \n                                        115915/61342 | View Details | Apply Now",
+      "raw_text": "Careers at Sea | HOME | CAREERS | CAREERS AT SEA | Features Jobs at Sea | View our latest jobs. Also keep an eye on our | LinkedIn | for regular\n                        updates. | SECOND OFF - VLCC | Deadline: By Date | Contract Duration: 8M (+1) | Total Needed: 2 | Salary: $3500 - $4200 | DWT/GRT/TEU: \n                                        160247/-- | View Details | Apply Now | SECOND OFF - Oil/Chem | Minimum requirement: one voyage experience. Ideal for those seeking to expand their maritime career. | Deadline: By Date | Contract Duration: 4M (+1) | Total Needed: 1 | Salary: $3500 - $3800 | DWT/GRT/TEU: \n                                        14460/9127 | View Details | Apply Now | AB - Crude Oil | Deadline: Urgent | Contract Duration: 8M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        105940/57220 | View Details | Apply Now | THIRD ENG - Crude Oil | Deadline: By Date | Contract Duration: 6M (+1) | Total Needed: 3 | Salary: Negotiable | DWT/GRT/TEU: \n                                        105940/57220 | View Details | Apply Now | 4TH ENGINEER - Oil/Chem | Deadline: By Date | Contract Duration: 6M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        29510/50120 | View Details | Apply Now | 4TH ENGINEER - Crude Oil | Deadline: Urgent | Contract Duration: 6M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        105940/57220 | View Details | Apply Now | AB - Oil/Chem | Deadline: By Date | Contract Duration: 8M (+1) | Total Needed: 2 | Salary: Negotiable | DWT/GRT/TEU: \n                                        14460/9127 | View Details | Apply Now | OILER - Oil/Chem | Deadline: By Date | Contract Duration: 8M (+1) | Total Needed: 2 | Salary: Negotiable | DWT/GRT/TEU: \n                                        14460/9127 | View Details | Apply Now | THIRD OFF - Crude Oil | Deadline: Urgent | Contract Duration: 6M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        109900/62900 | View Details | Apply Now | 4TH ENGINEER - VLCC | Deadline: Urgent | Contract Duration: 6M (+1) | Total Needed: 2 | Salary: Negotiable | DWT/GRT/TEU: \n                                        310105/160262 | View Details | Apply Now | THIRD OFF - Oil/Product | Deadline: Urgent | Contract Duration: 6M (+1) | Total Needed: 2 | Salary: Negotiable | DWT/GRT/TEU: \n                                        48700/28780 | View Details | Apply Now | 2ND ENGINEER - Oil/Product | Deadline: By Date | Contract Duration: 4M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        48700/28780 | View Details | Apply Now | FITTER - Crude Oil | Deadline: Urgent | Contract Duration: 8M (+1) | Total Needed: 1 | Salary: $2050 | DWT/GRT/TEU: \n                                        115915/61342 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.528648",
       "salary": "$3500",
       "contract": "8M (+1)",
-      "rank": "Other",
-      "ship_type": "Oil Tanker",
-      "apply_url": "https://mariaid.comapply-now?id=NDE=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NDE="
     },
     {
       "title": "SECOND OFF - VLCC",
-      "raw_content": "SECOND OFF - VLCC | Deadline: By Date | Contract Duration: 8M (+1) | Total Needed: 2 | Salary: $3500 - $4200 | DWT/GRT/TEU: \n                                        160247/-- | View Details | Apply Now",
+      "raw_text": "SECOND OFF - VLCC | Deadline: By Date | Contract Duration: 8M (+1) | Total Needed: 2 | Salary: $3500 - $4200 | DWT/GRT/TEU: \n                                        160247/-- | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.528932",
       "salary": "$3500",
       "contract": "8M (+1)",
-      "rank": "Other",
-      "ship_type": "Oil Tanker",
-      "apply_url": "https://mariaid.comapply-now?id=NDE=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NDE="
     },
     {
       "title": "SECOND OFF - VLCC",
-      "raw_content": "SECOND OFF - VLCC | Deadline: By Date | Contract Duration: 8M (+1) | Total Needed: 2 | Salary: $3500 - $4200 | DWT/GRT/TEU: \n                                        160247/-- | View Details | Apply Now",
+      "raw_text": "SECOND OFF - VLCC | Deadline: By Date | Contract Duration: 8M (+1) | Total Needed: 2 | Salary: $3500 - $4200 | DWT/GRT/TEU: \n                                        160247/-- | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.529075",
       "salary": "$3500",
       "contract": "8M (+1)",
-      "rank": "Other",
-      "ship_type": "Oil Tanker",
-      "apply_url": "https://mariaid.comapply-now?id=NDE=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NDE="
     },
     {
       "title": "SECOND OFF - Oil/Chem",
-      "raw_content": "SECOND OFF - Oil/Chem | Minimum requirement: one voyage experience. Ideal for those seeking to expand their maritime career. | Deadline: By Date | Contract Duration: 4M (+1) | Total Needed: 1 | Salary: $3500 - $3800 | DWT/GRT/TEU: \n                                        14460/9127 | View Details | Apply Now",
+      "raw_text": "SECOND OFF - Oil/Chem | Minimum requirement: one voyage experience. Ideal for those seeking to expand their maritime career. | Deadline: By Date | Contract Duration: 4M (+1) | Total Needed: 1 | Salary: $3500 - $3800 | DWT/GRT/TEU: \n                                        14460/9127 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.529212",
       "salary": "$3500",
       "contract": "4M (+1)",
-      "rank": "Other",
-      "ship_type": "Other",
-      "apply_url": "https://mariaid.comapply-now?id=NTA=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NTA="
     },
     {
       "title": "SECOND OFF - Oil/Chem",
-      "raw_content": "SECOND OFF - Oil/Chem | Minimum requirement: one voyage experience. Ideal for those seeking to expand their maritime career. | Deadline: By Date | Contract Duration: 4M (+1) | Total Needed: 1 | Salary: $3500 - $3800 | DWT/GRT/TEU: \n                                        14460/9127 | View Details | Apply Now",
+      "raw_text": "SECOND OFF - Oil/Chem | Minimum requirement: one voyage experience. Ideal for those seeking to expand their maritime career. | Deadline: By Date | Contract Duration: 4M (+1) | Total Needed: 1 | Salary: $3500 - $3800 | DWT/GRT/TEU: \n                                        14460/9127 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.529354",
       "salary": "$3500",
       "contract": "4M (+1)",
-      "rank": "Other",
-      "ship_type": "Other",
-      "apply_url": "https://mariaid.comapply-now?id=NTA=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NTA="
     },
     {
       "title": "AB - Crude Oil",
-      "raw_content": "AB - Crude Oil | Deadline: Urgent | Contract Duration: 8M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        105940/57220 | View Details | Apply Now",
+      "raw_text": "AB - Crude Oil | Deadline: Urgent | Contract Duration: 8M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        105940/57220 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.529485",
       "contract": "8M (+1)",
-      "rank": "Able Seaman",
-      "ship_type": "Other",
-      "apply_url": "https://mariaid.comapply-now?id=NTM=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NTM="
     },
     {
       "title": "AB - Crude Oil",
-      "raw_content": "AB - Crude Oil | Deadline: Urgent | Contract Duration: 8M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        105940/57220 | View Details | Apply Now",
+      "raw_text": "AB - Crude Oil | Deadline: Urgent | Contract Duration: 8M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        105940/57220 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.529614",
       "contract": "8M (+1)",
-      "rank": "Able Seaman",
-      "ship_type": "Other",
-      "apply_url": "https://mariaid.comapply-now?id=NTM=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NTM="
     },
     {
       "title": "THIRD ENG - Crude Oil",
-      "raw_content": "THIRD ENG - Crude Oil | Deadline: By Date | Contract Duration: 6M (+1) | Total Needed: 3 | Salary: Negotiable | DWT/GRT/TEU: \n                                        105940/57220 | View Details | Apply Now",
+      "raw_text": "THIRD ENG - Crude Oil | Deadline: By Date | Contract Duration: 6M (+1) | Total Needed: 3 | Salary: Negotiable | DWT/GRT/TEU: \n                                        105940/57220 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.529758",
       "contract": "6M (+1)",
-      "rank": "Other",
-      "ship_type": "Other",
-      "apply_url": "https://mariaid.comapply-now?id=NTQ=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NTQ="
     },
     {
       "title": "THIRD ENG - Crude Oil",
-      "raw_content": "THIRD ENG - Crude Oil | Deadline: By Date | Contract Duration: 6M (+1) | Total Needed: 3 | Salary: Negotiable | DWT/GRT/TEU: \n                                        105940/57220 | View Details | Apply Now",
+      "raw_text": "THIRD ENG - Crude Oil | Deadline: By Date | Contract Duration: 6M (+1) | Total Needed: 3 | Salary: Negotiable | DWT/GRT/TEU: \n                                        105940/57220 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.529882",
       "contract": "6M (+1)",
-      "rank": "Other",
-      "ship_type": "Other",
-      "apply_url": "https://mariaid.comapply-now?id=NTQ=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NTQ="
     },
     {
       "title": "4TH ENGINEER - Oil/Chem",
-      "raw_content": "4TH ENGINEER - Oil/Chem | Deadline: By Date | Contract Duration: 6M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        29510/50120 | View Details | Apply Now",
+      "raw_text": "4TH ENGINEER - Oil/Chem | Deadline: By Date | Contract Duration: 6M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        29510/50120 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.530003",
       "contract": "6M (+1)",
-      "rank": "Other",
-      "ship_type": "Other",
-      "apply_url": "https://mariaid.comapply-now?id=NTU=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NTU="
     },
     {
       "title": "4TH ENGINEER - Oil/Chem",
-      "raw_content": "4TH ENGINEER - Oil/Chem | Deadline: By Date | Contract Duration: 6M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        29510/50120 | View Details | Apply Now",
+      "raw_text": "4TH ENGINEER - Oil/Chem | Deadline: By Date | Contract Duration: 6M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        29510/50120 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.530123",
       "contract": "6M (+1)",
-      "rank": "Other",
-      "ship_type": "Other",
-      "apply_url": "https://mariaid.comapply-now?id=NTU=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NTU="
     },
     {
       "title": "4TH ENGINEER - Crude Oil",
-      "raw_content": "4TH ENGINEER - Crude Oil | Deadline: Urgent | Contract Duration: 6M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        105940/57220 | View Details | Apply Now",
+      "raw_text": "4TH ENGINEER - Crude Oil | Deadline: Urgent | Contract Duration: 6M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        105940/57220 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.530242",
       "contract": "6M (+1)",
-      "rank": "Other",
-      "ship_type": "Other",
-      "apply_url": "https://mariaid.comapply-now?id=NTY=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NTY="
     },
     {
       "title": "4TH ENGINEER - Crude Oil",
-      "raw_content": "4TH ENGINEER - Crude Oil | Deadline: Urgent | Contract Duration: 6M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        105940/57220 | View Details | Apply Now",
+      "raw_text": "4TH ENGINEER - Crude Oil | Deadline: Urgent | Contract Duration: 6M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        105940/57220 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.530360",
       "contract": "6M (+1)",
-      "rank": "Other",
-      "ship_type": "Other",
-      "apply_url": "https://mariaid.comapply-now?id=NTY=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NTY="
     },
     {
       "title": "AB - Oil/Chem",
-      "raw_content": "AB - Oil/Chem | Deadline: By Date | Contract Duration: 8M (+1) | Total Needed: 2 | Salary: Negotiable | DWT/GRT/TEU: \n                                        14460/9127 | View Details | Apply Now",
+      "raw_text": "AB - Oil/Chem | Deadline: By Date | Contract Duration: 8M (+1) | Total Needed: 2 | Salary: Negotiable | DWT/GRT/TEU: \n                                        14460/9127 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.530483",
       "contract": "8M (+1)",
-      "rank": "Able Seaman",
-      "ship_type": "Other",
-      "apply_url": "https://mariaid.comapply-now?id=NTc=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NTc="
     },
     {
       "title": "AB - Oil/Chem",
-      "raw_content": "AB - Oil/Chem | Deadline: By Date | Contract Duration: 8M (+1) | Total Needed: 2 | Salary: Negotiable | DWT/GRT/TEU: \n                                        14460/9127 | View Details | Apply Now",
+      "raw_text": "AB - Oil/Chem | Deadline: By Date | Contract Duration: 8M (+1) | Total Needed: 2 | Salary: Negotiable | DWT/GRT/TEU: \n                                        14460/9127 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.530601",
       "contract": "8M (+1)",
-      "rank": "Able Seaman",
-      "ship_type": "Other",
-      "apply_url": "https://mariaid.comapply-now?id=NTc=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NTc="
     },
     {
       "title": "OILER - Oil/Chem",
-      "raw_content": "OILER - Oil/Chem | Deadline: By Date | Contract Duration: 8M (+1) | Total Needed: 2 | Salary: Negotiable | DWT/GRT/TEU: \n                                        14460/9127 | View Details | Apply Now",
+      "raw_text": "OILER - Oil/Chem | Deadline: By Date | Contract Duration: 8M (+1) | Total Needed: 2 | Salary: Negotiable | DWT/GRT/TEU: \n                                        14460/9127 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.530736",
       "contract": "8M (+1)",
-      "rank": "Oiler",
-      "ship_type": "Other",
-      "apply_url": "https://mariaid.comapply-now?id=NTg=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NTg="
     },
     {
       "title": "OILER - Oil/Chem",
-      "raw_content": "OILER - Oil/Chem | Deadline: By Date | Contract Duration: 8M (+1) | Total Needed: 2 | Salary: Negotiable | DWT/GRT/TEU: \n                                        14460/9127 | View Details | Apply Now",
+      "raw_text": "OILER - Oil/Chem | Deadline: By Date | Contract Duration: 8M (+1) | Total Needed: 2 | Salary: Negotiable | DWT/GRT/TEU: \n                                        14460/9127 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.530863",
       "contract": "8M (+1)",
-      "rank": "Oiler",
-      "ship_type": "Other",
-      "apply_url": "https://mariaid.comapply-now?id=NTg=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NTg="
     },
     {
       "title": "THIRD OFF - Crude Oil",
-      "raw_content": "THIRD OFF - Crude Oil | Deadline: Urgent | Contract Duration: 6M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        109900/62900 | View Details | Apply Now",
+      "raw_text": "THIRD OFF - Crude Oil | Deadline: Urgent | Contract Duration: 6M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        109900/62900 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.530987",
       "contract": "6M (+1)",
-      "rank": "Other",
-      "ship_type": "Other",
-      "apply_url": "https://mariaid.comapply-now?id=NjA=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NjA="
     },
     {
       "title": "THIRD OFF - Crude Oil",
-      "raw_content": "THIRD OFF - Crude Oil | Deadline: Urgent | Contract Duration: 6M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        109900/62900 | View Details | Apply Now",
+      "raw_text": "THIRD OFF - Crude Oil | Deadline: Urgent | Contract Duration: 6M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        109900/62900 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.531106",
       "contract": "6M (+1)",
-      "rank": "Other",
-      "ship_type": "Other",
-      "apply_url": "https://mariaid.comapply-now?id=NjA=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NjA="
     },
     {
       "title": "4TH ENGINEER - VLCC",
-      "raw_content": "4TH ENGINEER - VLCC | Deadline: Urgent | Contract Duration: 6M (+1) | Total Needed: 2 | Salary: Negotiable | DWT/GRT/TEU: \n                                        310105/160262 | View Details | Apply Now",
+      "raw_text": "4TH ENGINEER - VLCC | Deadline: Urgent | Contract Duration: 6M (+1) | Total Needed: 2 | Salary: Negotiable | DWT/GRT/TEU: \n                                        310105/160262 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.531226",
       "contract": "6M (+1)",
-      "rank": "Other",
-      "ship_type": "Oil Tanker",
-      "apply_url": "https://mariaid.comapply-now?id=NjE=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NjE="
     },
     {
       "title": "4TH ENGINEER - VLCC",
-      "raw_content": "4TH ENGINEER - VLCC | Deadline: Urgent | Contract Duration: 6M (+1) | Total Needed: 2 | Salary: Negotiable | DWT/GRT/TEU: \n                                        310105/160262 | View Details | Apply Now",
+      "raw_text": "4TH ENGINEER - VLCC | Deadline: Urgent | Contract Duration: 6M (+1) | Total Needed: 2 | Salary: Negotiable | DWT/GRT/TEU: \n                                        310105/160262 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.531344",
       "contract": "6M (+1)",
-      "rank": "Other",
-      "ship_type": "Oil Tanker",
-      "apply_url": "https://mariaid.comapply-now?id=NjE=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NjE="
     },
     {
       "title": "THIRD OFF - Oil/Product",
-      "raw_content": "THIRD OFF - Oil/Product | Deadline: Urgent | Contract Duration: 6M (+1) | Total Needed: 2 | Salary: Negotiable | DWT/GRT/TEU: \n                                        48700/28780 | View Details | Apply Now",
+      "raw_text": "THIRD OFF - Oil/Product | Deadline: Urgent | Contract Duration: 6M (+1) | Total Needed: 2 | Salary: Negotiable | DWT/GRT/TEU: \n                                        48700/28780 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.531462",
       "contract": "6M (+1)",
-      "rank": "Other",
-      "ship_type": "Other",
-      "apply_url": "https://mariaid.comapply-now?id=NjQ=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NjQ="
     },
     {
       "title": "THIRD OFF - Oil/Product",
-      "raw_content": "THIRD OFF - Oil/Product | Deadline: Urgent | Contract Duration: 6M (+1) | Total Needed: 2 | Salary: Negotiable | DWT/GRT/TEU: \n                                        48700/28780 | View Details | Apply Now",
+      "raw_text": "THIRD OFF - Oil/Product | Deadline: Urgent | Contract Duration: 6M (+1) | Total Needed: 2 | Salary: Negotiable | DWT/GRT/TEU: \n                                        48700/28780 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.531584",
       "contract": "6M (+1)",
-      "rank": "Other",
-      "ship_type": "Other",
-      "apply_url": "https://mariaid.comapply-now?id=NjQ=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NjQ="
     },
     {
       "title": "2ND ENGINEER - Oil/Product",
-      "raw_content": "2ND ENGINEER - Oil/Product | Deadline: By Date | Contract Duration: 4M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        48700/28780 | View Details | Apply Now",
+      "raw_text": "2ND ENGINEER - Oil/Product | Deadline: By Date | Contract Duration: 4M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        48700/28780 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.531723",
       "contract": "4M (+1)",
-      "rank": "2nd Engineer",
-      "ship_type": "Other",
-      "apply_url": "https://mariaid.comapply-now?id=NjU=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NjU="
     },
     {
       "title": "2ND ENGINEER - Oil/Product",
-      "raw_content": "2ND ENGINEER - Oil/Product | Deadline: By Date | Contract Duration: 4M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        48700/28780 | View Details | Apply Now",
+      "raw_text": "2ND ENGINEER - Oil/Product | Deadline: By Date | Contract Duration: 4M (+1) | Total Needed: 1 | Salary: Negotiable | DWT/GRT/TEU: \n                                        48700/28780 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.531846",
       "contract": "4M (+1)",
-      "rank": "2nd Engineer",
-      "ship_type": "Other",
-      "apply_url": "https://mariaid.comapply-now?id=NjU=",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=NjU="
     },
     {
       "title": "FITTER - Crude Oil",
-      "raw_content": "FITTER - Crude Oil | Deadline: Urgent | Contract Duration: 8M (+1) | Total Needed: 1 | Salary: $2050 | DWT/GRT/TEU: \n                                        115915/61342 | View Details | Apply Now",
+      "raw_text": "FITTER - Crude Oil | Deadline: Urgent | Contract Duration: 8M (+1) | Total Needed: 1 | Salary: $2050 | DWT/GRT/TEU: \n                                        115915/61342 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.531966",
       "salary": "$2050",
       "contract": "8M (+1)",
-      "rank": "Fitter",
-      "ship_type": "Other",
-      "apply_url": "https://mariaid.comapply-now?id=MjQ2",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=MjQ2"
     },
     {
       "title": "FITTER - Crude Oil",
-      "raw_content": "FITTER - Crude Oil | Deadline: Urgent | Contract Duration: 8M (+1) | Total Needed: 1 | Salary: $2050 | DWT/GRT/TEU: \n                                        115915/61342 | View Details | Apply Now",
+      "raw_text": "FITTER - Crude Oil | Deadline: Urgent | Contract Duration: 8M (+1) | Total Needed: 1 | Salary: $2050 | DWT/GRT/TEU: \n                                        115915/61342 | View Details | Apply Now",
+      "scraped_at": "2026-02-14T22:25:25.532089",
       "salary": "$2050",
       "contract": "8M (+1)",
-      "rank": "Fitter",
-      "ship_type": "Other",
-      "apply_url": "https://mariaid.comapply-now?id=MjQ2",
-      "source": "MariAid",
-      "mla_number": "MLA-114",
-      "agency": "MariAid Limited"
+      "apply_url": "https://mariaid.comapply-now?id=MjQ2"
     }
   ]
 }
