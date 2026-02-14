@@ -1,0 +1,92 @@
+name: Scrape MariAid Jobs
+
+on:
+  # Run daily at 9 AM UTC (adjust timezone as needed)
+  schedule:
+    - cron: '0 9 * * *'
+
+  # Allow manual trigger
+  workflow_dispatch:
+
+  # Run on push to test (remove after testing)
+  push:
+    branches:
+      - claude/codebase-review-2KuWF
+    paths:
+      - 'scripts/scrape_mariaid_jobs.py'
+      - '.github/workflows/scrape-jobs.yml'
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write  # Required to commit and push changes
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for proper git operations
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 🔍 Run job scraper
+        run: |
+          python scripts/scrape_mariaid_jobs.py
+
+      - name: 📊 Generate summary
+        run: |
+          echo "## 🚢 MariAid Jobs Scrape Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Date:** $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f jobs/latest_jobs.json ]; then
+            JOB_COUNT=$(jq '.total_jobs' jobs/latest_jobs.json)
+            echo "**Total Jobs Found:** $JOB_COUNT" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Job Listings:" >> $GITHUB_STEP_SUMMARY
+            jq -r '.jobs[] | "- **\(.title // "Unknown")** \(.salary // "") \(.contract // "")"' jobs/latest_jobs.json >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ No jobs file found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 💾 Commit and push changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "GitHub Actions Bot"
+
+          git add jobs/
+
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "🤖 Auto-update: MariAid jobs scraped on $(date -u +%Y-%m-%d)"
+            git push
+            echo "✅ Changes pushed successfully"
+          fi
+
+      - name: 📧 Notify on new jobs (optional)
+        if: success()
+        run: |
+          echo "✅ Job scraping completed successfully!"
+          # You can add email/Slack notifications here if needed
+
+      - name: 📤 Upload job data as artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mariaid-jobs-${{ github.run_number }}
+          path: jobs/
+          retention-days: 90

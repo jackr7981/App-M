@@ -1,0 +1,82 @@
+name: Scrape MariAid Jobs Daily
+
+on:
+  schedule:
+    # Run daily at 00:00 UTC (midnight)
+    - cron: '0 0 * * *'
+
+  # Allow manual trigger for testing
+  workflow_dispatch:
+
+  # Also run on push to test
+  push:
+    branches:
+      - main
+      - claude/codebase-review-2KuWF
+    paths:
+      - 'scripts/scrape_mariaid_jobs_v2.py'
+      - '.github/workflows/scrape-mariaid-jobs.yml'
+
+jobs:
+  scrape-and-upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests beautifulsoup4 lxml supabase
+
+      - name: 🔍 Scrape MariAid jobs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          python scripts/scrape_mariaid_jobs_v2.py
+
+      - name: 📊 Generate summary
+        if: always()
+        run: |
+          echo "## 🚢 MariAid Job Scraper Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Scrape Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f jobs/latest_jobs.json ]; then
+            TOTAL_JOBS=$(jq '.total_jobs' jobs/latest_jobs.json)
+            echo "✅ **Jobs Found:** $TOTAL_JOBS" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            echo "### 📋 Latest Jobs" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            jq -r '.jobs[] | "• \(.title) - \(.rank // "Unknown rank")"' jobs/latest_jobs.json | head -10 >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ No jobs scraped or file not created" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*Jobs automatically uploaded to Supabase database*" >> $GITHUB_STEP_SUMMARY
+
+      - name: 📁 Upload scraped jobs as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mariaid-jobs-${{ github.run_number }}
+          path: jobs/
+          retention-days: 30
+
+      - name: 📧 Notify on failure
+        if: failure()
+        run: |
+          echo "::error::MariAid job scraper failed!"
+          echo "::error::Check the workflow logs for details."

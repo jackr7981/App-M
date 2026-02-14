@@ -299,7 +299,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onEditProf
                 )}
 
                 {/* COMPONENT VIEWS */}
-                {activeTab === 'jobs' && <JobBoard userProfile={user.profile} />}
+                {activeTab === 'jobs' && (
+                    <JobBoard
+                        userProfile={user.profile}
+                        onNavigateToAgents={(mlaNumber) => {
+                            setActiveTab('agents');
+                            // Store MLA number to highlight in Manning Agents component
+                            sessionStorage.setItem('highlight_mla', mlaNumber);
+                        }}
+                    />
+                )}
                 {activeTab === 'documents' && (
                     <Documents
                         documents={documents}

@@ -1,0 +1,130 @@
+name: Gemini Model Availability Check
+
+on:
+  schedule:
+    # Runs daily at 00:00 UTC (midnight)
+    - cron: '0 0 * * *'
+
+  # Allow manual trigger for testing
+  workflow_dispatch:
+
+  # Also run on push to monitor changes
+  push:
+    branches:
+      - main
+      - claude/codebase-review-2KuWF
+    paths:
+      - 'scripts/check_gemini_models.py'
+      - '.github/workflows/gemini-model-check.yml'
+
+jobs:
+  check-model-availability:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write  # To commit report files
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install google-genai
+
+      - name: 🔍 Check Gemini model availability
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python scripts/check_gemini_models.py
+
+      - name: 📊 Generate GitHub Summary
+        if: always()
+        run: |
+          echo "## 🤖 Gemini Model Availability Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Check Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f reports/latest-model-check.json ]; then
+            echo "### 📋 Summary" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            # Extract key info from JSON report
+            PRIMARY_STATUS=$(jq -r '.primary_model_available' reports/latest-model-check.json)
+            PRIMARY_MODEL=$(jq -r '.primary_model' reports/latest-model-check.json)
+            TOTAL_MODELS=$(jq -r '.total_models' reports/latest-model-check.json)
+
+            if [ "$PRIMARY_STATUS" = "true" ]; then
+              echo "✅ **Status:** All systems operational" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "❌ **Status:** Primary model unavailable - ACTION REQUIRED" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "- **Primary Model:** \`$PRIMARY_MODEL\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **Primary Status:** $([ "$PRIMARY_STATUS" = "true" ] && echo "✅ Available" || echo "❌ Unavailable")" >> $GITHUB_STEP_SUMMARY
+            echo "- **Total Models Found:** $TOTAL_MODELS" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            echo "### 🔄 Fallback Models" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            jq -r '.fallback_models.available[]' reports/latest-model-check.json | while read model; do
+              echo "- ✅ \`$model\`" >> $GITHUB_STEP_SUMMARY
+            done
+
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 🤖 All Gemini Models" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            jq -r '.gemini_models[]' reports/latest-model-check.json >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "---" >> $GITHUB_STEP_SUMMARY
+            echo "*Full report available in workflow artifacts*" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Report file not generated. Check logs for errors." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 📁 Upload report artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gemini-model-reports
+          path: reports/
+          retention-days: 90
+
+      - name: 💾 Commit report to repository
+        if: always()
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          # Add reports directory
+          git add reports/
+
+          # Only commit if there are changes
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update Gemini model availability report [skip ci]"
+            git push
+          fi
+        continue-on-error: true
+
+      - name: 📧 Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Gemini model check failed! Primary model may be unavailable."
+          echo "::error::Please check the workflow logs and reports for details."
+          echo "::error::Consider updating to a fallback model if needed."

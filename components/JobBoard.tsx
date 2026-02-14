@@ -3,6 +3,7 @@ import { JobPosting, UserProfile, ShipType, Rank } from '../types';
 import { Briefcase, MapPin, DollarSign, Calendar, Search, Filter, MessageSquare, Phone, Mail, PlusCircle, Sparkles, Loader2, Copy } from 'lucide-react';
 import { parseJobPosting } from '../services/geminiService';
 import { supabase } from '../services/supabase';
+import { matchesRankFilter, matchesShipTypeFilter } from '../utils/rankShipNormalizer';
 
 // Mock Initial Jobs
 const INITIAL_JOBS: JobPosting[] = [
@@ -46,18 +47,32 @@ const INITIAL_JOBS: JobPosting[] = [
 
 interface JobBoardProps {
   userProfile?: UserProfile;
+  onNavigateToAgents?: (mlaNumber: string) => void;
 }
 
-export const JobBoard: React.FC<JobBoardProps> = ({ userProfile }) => {
+export const JobBoard: React.FC<JobBoardProps> = ({ userProfile, onNavigateToAgents }) => {
   const [jobs, setJobs] = useState<JobPosting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filterRank, setFilterRank] = useState<string>(userProfile?.rank || 'All');
   const [filterType, setFilterType] = useState<string>(userProfile?.preferredShipType || 'All');
+  const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
 
   // Import Modal State
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState('');
   const [isParsing, setIsParsing] = useState(false);
+
+  const toggleDescription = (jobId: string) => {
+    setExpandedDescriptions(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(jobId)) {
+        newSet.delete(jobId);
+      } else {
+        newSet.add(jobId);
+      }
+      return newSet;
+    });
+  };
 
   useEffect(() => {
     const fetchJobs = async () => {
@@ -108,8 +123,12 @@ export const JobBoard: React.FC<JobBoardProps> = ({ userProfile }) => {
 
   const filteredJobs = useMemo(() => {
     return jobs.filter(job => {
-      const matchRank = filterRank === 'All' || job.rank.includes(filterRank) || (filterRank === 'Other' && job.rank === 'Unknown');
-      const matchType = filterType === 'All' || job.shipType === filterType;
+      // Use smart matching to handle rank variants (e.g., "3/O" matches "3rd Officer")
+      const matchRank = matchesRankFilter(job.rank, filterRank);
+
+      // Use smart matching to handle ship type variants (e.g., "Aframax" matches "Oil Tanker")
+      const matchType = matchesShipTypeFilter(job.shipType, filterType);
+
       return matchRank && matchType;
     }).sort((a, b) => b.postedDate - a.postedDate);
   }, [jobs, filterRank, filterType]);
@@ -279,7 +298,21 @@ export const JobBoard: React.FC<JobBoardProps> = ({ userProfile }) => {
               </div>
 
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm text-slate-600 mb-3">
-                <p className="line-clamp-3">{job.description}</p>
+                <p className={expandedDescriptions.has(job.id) ? '' : 'line-clamp-3'}>
+                  {job.description}
+                </p>
+                {job.description && job.description.length > 150 && (
+                  <button
+                    onClick={() => toggleDescription(job.id)}
+                    className="text-emerald-600 hover:text-emerald-700 font-semibold text-xs mt-2 flex items-center gap-1"
+                  >
+                    {expandedDescriptions.has(job.id) ? (
+                      <>Show Less <span className="text-lg leading-none">↑</span></>
+                    ) : (
+                      <>Show More <span className="text-lg leading-none">↓</span></>
+                    )}
+                  </button>
+                )}
               </div>
 
               {/* MLA Number & Address */}
@@ -288,7 +321,16 @@ export const JobBoard: React.FC<JobBoardProps> = ({ userProfile }) => {
                   {job.mlaNumber && job.mlaNumber !== 'N/A' && (
                     <div className="bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
                       <span className="text-[10px] text-amber-600 uppercase font-bold block mb-0.5">MLA Number</span>
-                      <div className="text-amber-900 font-semibold text-xs">{job.mlaNumber}</div>
+                      {onNavigateToAgents ? (
+                        <button
+                          onClick={() => onNavigateToAgents(job.mlaNumber!)}
+                          className="text-amber-900 hover:text-amber-700 font-semibold text-xs underline decoration-dotted underline-offset-2 hover:decoration-solid transition-all"
+                        >
+                          {job.mlaNumber} →
+                        </button>
+                      ) : (
+                        <div className="text-amber-900 font-semibold text-xs">{job.mlaNumber}</div>
+                      )}
                     </div>
                   )}
                   {job.agencyAddress && job.agencyAddress !== 'N/A' && (

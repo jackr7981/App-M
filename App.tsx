@@ -7,6 +7,10 @@ import { ArrowRight, Mail, Lock, Upload, Calendar, Phone, CheckCircle, User as U
 import { supabase, getStorageUrl, isMockMode, isConfigured } from './services/supabase';
 import { formatDate } from './utils/format';
 import { SessionTracker } from './components/SessionTracker';
+import { EncryptionSetupWizard } from './components/EncryptionSetupWizard';
+import { EncryptionUnlockModal } from './components/EncryptionUnlockModal';
+import { AccountRecoveryModal } from './components/AccountRecoveryModal';
+import { keyManager, type RecoveryKit } from './services/encryption';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.LANDING);
@@ -40,6 +44,36 @@ const App: React.FC = () => {
   const [dosError, setDosError] = useState<string | null>(null);
   const [dosStep, setDosStep] = useState<'instructions' | 'paste_url' | 'fetching' | 'success'>('instructions');
   const [dosUrl, setDosUrl] = useState('');
+
+  // Encryption States
+  const [showEncryptionSetup, setShowEncryptionSetup] = useState(false);
+  const [showEncryptionUnlock, setShowEncryptionUnlock] = useState(false);
+  const [showAccountRecovery, setShowAccountRecovery] = useState(false);
+  const [encryptionInitialized, setEncryptionInitialized] = useState(false);
+  const [encryptionUnlocked, setEncryptionUnlocked] = useState(false);
+
+  // Check encryption status on mount and after login
+  useEffect(() => {
+    const checkEncryptionStatus = async () => {
+      const initialized = await keyManager.isInitialized();
+      setEncryptionInitialized(initialized);
+
+      if (initialized) {
+        const unlocked = keyManager.isUnlocked();
+        setEncryptionUnlocked(unlocked);
+
+        // Show unlock modal if user is logged in but encryption is locked
+        if (currentUser && !unlocked) {
+          setShowEncryptionUnlock(true);
+        }
+      } else if (currentUser) {
+        // User logged in but encryption not set up - show setup wizard
+        setShowEncryptionSetup(true);
+      }
+    };
+
+    checkEncryptionStatus();
+  }, [currentUser]);
 
   useEffect(() => {
     // Network Status Listeners
@@ -1239,6 +1273,53 @@ const App: React.FC = () => {
           onToggleOnboardStatus={handleToggleOnboardStatus}
         />
         <SessionTracker userId={currentUser.id} initialMinutes={currentUser.profile?.totalUsageMinutes} />
+
+        {/* Encryption Setup Wizard (first-time users) */}
+        {showEncryptionSetup && (
+          <EncryptionSetupWizard
+            onComplete={(recoveryKit: RecoveryKit) => {
+              setShowEncryptionSetup(false);
+              setEncryptionInitialized(true);
+              setEncryptionUnlocked(true);
+              console.log('✅ Encryption setup complete! Recovery phrase saved.');
+            }}
+            onSkip={() => {
+              setShowEncryptionSetup(false);
+              // User skipped, will be prompted again on next login
+            }}
+          />
+        )}
+
+        {/* Encryption Unlock Modal (returning users) */}
+        {showEncryptionUnlock && encryptionInitialized && (
+          <EncryptionUnlockModal
+            onUnlock={() => {
+              setShowEncryptionUnlock(false);
+              setEncryptionUnlocked(true);
+            }}
+            onForgotPassword={() => {
+              setShowEncryptionUnlock(false);
+              setShowAccountRecovery(true);
+            }}
+            allowDismiss={true}
+            onDismiss={() => setShowEncryptionUnlock(false)}
+          />
+        )}
+
+        {/* Account Recovery Modal (forgotten password) */}
+        {showAccountRecovery && (
+          <AccountRecoveryModal
+            onRecoverySuccess={() => {
+              setShowAccountRecovery(false);
+              setEncryptionUnlocked(true);
+              alert('✅ Account recovered successfully! You can now access your encrypted documents with your new password.');
+            }}
+            onCancel={() => {
+              setShowAccountRecovery(false);
+              setShowEncryptionUnlock(true);
+            }}
+          />
+        )}
       </>
     );
   }
