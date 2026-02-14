@@ -919,6 +919,8 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
                                                 type="date"
                                                 value={formData.expiryDate}
                                                 onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
+                                                min="1900-01-01"
+                                                max="2099-12-31"
                                                 className="w-full pl-9 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                             />
                                         </div>
