@@ -27,6 +27,7 @@ type TabId = 'home' | 'jobs' | 'chat' | 'documents' | 'menu' | 'seaservice' | 'a
 export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onEditProfile, onUpdateSeaService, onToggleJobStatus, onToggleOnboardStatus }) => {
     const [activeTab, setActiveTab] = useState<TabId>('home');
     const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [highlightedMLA, setHighlightedMLA] = useState<string | null>(null);
 
     // Chat State
     const [messages, setMessages] = useState<ChatMessage[]>([
@@ -303,9 +304,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onEditProf
                     <JobBoard
                         userProfile={user.profile}
                         onNavigateToAgents={(mlaNumber) => {
+                            // Set highlighted MLA and switch to agents tab
+                            setHighlightedMLA(mlaNumber);
                             setActiveTab('agents');
-                            // Store MLA number to highlight in Manning Agents component
-                            sessionStorage.setItem('highlight_mla', mlaNumber);
                         }}
                     />
                 )}
@@ -319,7 +320,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onEditProf
                     />
                 )}
                 {activeTab === 'seaservice' && <SeaService records={user.profile?.seaServiceHistory || []} onUpdate={onUpdateSeaService} />}
-                {activeTab === 'agents' && <ManningAgents userProfile={user.profile} />}
+                {activeTab === 'agents' && (
+                    <ManningAgents
+                        userProfile={user.profile}
+                        highlightedMLA={highlightedMLA}
+                        onClearHighlight={() => setHighlightedMLA(null)}
+                    />
+                )}
                 {activeTab === 'medical' && <MedicalCenters />}
                 {activeTab === 'community' && <Community user={user} />}
                 {activeTab === 'medical' && <MedicalCenters />}

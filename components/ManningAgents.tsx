@@ -6,26 +6,30 @@ import { APPROVED_AGENTS } from './agentsData';
 
 interface ManningAgentsProps {
   userProfile?: UserProfile;
+  highlightedMLA?: string | null;
+  onClearHighlight?: () => void;
 }
 
-export const ManningAgents: React.FC<ManningAgentsProps> = ({ userProfile }) => {
+export const ManningAgents: React.FC<ManningAgentsProps> = ({ userProfile, highlightedMLA, onClearHighlight }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [cityFilter, setCityFilter] = useState('All');
   const [selectedAgent, setSelectedAgent] = useState<ManningAgent | null>(null);
   const [showMap, setShowMap] = useState(false);
 
-  // Check for highlighted MLA from session storage (when navigating from JobBoard)
+  // Open agent modal when highlightedMLA is provided (from JobBoard navigation)
   useEffect(() => {
-    const highlightMLA = sessionStorage.getItem('highlight_mla');
-    if (highlightMLA) {
-      const agent = APPROVED_AGENTS.find(a => a.licenseNumber === highlightMLA);
+    if (highlightedMLA) {
+      const agent = APPROVED_AGENTS.find(a => a.licenseNumber === highlightedMLA);
       if (agent) {
         setSelectedAgent(agent);
-        setSearchQuery(highlightMLA); // Also set search to help user see context
+        setSearchQuery(highlightedMLA); // Also set search to help user see context
       }
-      sessionStorage.removeItem('highlight_mla'); // Clear after use
+      // Clear the highlight after using it
+      if (onClearHighlight) {
+        onClearHighlight();
+      }
     }
-  }, []);
+  }, [highlightedMLA, onClearHighlight]);
 
   // Reset map view when closing modal or switching agents
   useEffect(() => {
