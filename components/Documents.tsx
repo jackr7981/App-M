@@ -415,10 +415,9 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
                 if (!formattedTitle || formattedTitle === 'Unknown Document' || formattedTitle === '') {
                     formattedTitle = fileName.split('.').slice(0, -1).join('.') || fileName;
                 }
+                // Replace long certificate names with abbreviations
                 formattedTitle = formattedTitle.replace(/Certificate of Proficiency/gi, 'COP');
-                if (userName && !formattedTitle.toLowerCase().includes(userName.toLowerCase())) {
-                    formattedTitle = `${formattedTitle} - ${userName}`;
-                }
+                formattedTitle = formattedTitle.replace(/Certificate of Competency/gi, 'COC');
 
                 const finalExpiry = qrData?.expiry || (geminiData.expiryDate !== 'N/A' ? geminiData.expiryDate : '');
                 const finalNumber = qrData?.number || (geminiData.documentNumber !== 'N/A' ? geminiData.documentNumber : '');
@@ -751,7 +750,7 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
                                 </div>
 
                                 {/* Thumbnail Strip */}
-                                {doc.fileUrl && !doc.fileUrl.endsWith('.pdf') && (
+                                {doc.fileUrl && !(doc.fileUrl.toLowerCase().includes('.pdf') || doc.fileUrl.includes('application/pdf')) && (
                                     <div className="h-24 w-full bg-slate-100 rounded-lg overflow-hidden relative mt-2">
                                         <img
                                             src={doc.fileUrl}
@@ -829,23 +828,64 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
                     <div className="flex-1 overflow-auto flex items-center justify-center p-4 relative">
                         {/* Main Image or Page */}
                         {viewPage === 0 ? (
-                            viewingDoc.fileUrl.endsWith('.pdf') ? (
+                            viewingDoc.fileUrl.toLowerCase().includes('.pdf') || viewingDoc.fileUrl.includes('application/pdf') ? (
                                 <div className="bg-white p-2 rounded shadow-lg max-w-full">
                                     <Document
-                                        file={viewingDoc.fileUrl}
+                                        file={{ url: viewingDoc.fileUrl }}
                                         onLoadSuccess={({ numPages }) => setNumPages(numPages)}
-                                        loading={<Loader2 className="animate-spin text-white w-8 h-8" />}
-                                        error={<div className="text-white">Failed to load PDF (Offline?)</div>}
+                                        onLoadError={(error) => {
+                                            console.error('PDF load error:', error);
+                                        }}
+                                        loading={
+                                            <div className="flex flex-col items-center justify-center p-8">
+                                                <Loader2 className="animate-spin text-blue-600 w-12 h-12 mb-4" />
+                                                <p className="text-slate-600 text-sm">Loading PDF...</p>
+                                            </div>
+                                        }
+                                        error={
+                                            <div className="flex flex-col items-center justify-center p-8 bg-slate-100 rounded-lg">
+                                                <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
+                                                <p className="text-slate-700 font-semibold mb-2">Failed to load PDF</p>
+                                                <p className="text-slate-500 text-sm mb-4">The PDF preview is not available</p>
+                                                <a
+                                                    href={viewingDoc.fileUrl}
+                                                    download
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                                                >
+                                                    <Download className="w-4 h-4" />
+                                                    Download PDF
+                                                </a>
+                                            </div>
+                                        }
                                     >
-                                        <Page pageNumber={pdfPageNumber} width={Math.min(window.innerWidth - 40, 600)} />
+                                        <Page
+                                            pageNumber={pdfPageNumber}
+                                            width={Math.min(window.innerWidth - 40, 600)}
+                                            renderTextLayer={false}
+                                            renderAnnotationLayer={false}
+                                        />
                                     </Document>
                                     {numPages && (
                                         <div className="flex justify-between items-center mt-2 px-2">
-                                            <button disabled={pdfPageNumber <= 1} onClick={() => setPdfPageNumber(p => p - 1)} className="text-slate-800 disabled:opacity-30"><ChevronLeft /></button>
-                                            <span className="text-xs text-slate-500">Page {pdfPageNumber} of {numPages}</span>
-                                            <button disabled={pdfPageNumber >= numPages} onClick={() => setPdfPageNumber(p => p + 1)} className="text-slate-800 disabled:opacity-30"><ChevronRight /></button>
+                                            <button disabled={pdfPageNumber <= 1} onClick={() => setPdfPageNumber(p => p - 1)} className="text-slate-800 disabled:opacity-30 p-2 hover:bg-slate-100 rounded"><ChevronLeft /></button>
+                                            <span className="text-xs text-slate-600 font-medium">Page {pdfPageNumber} of {numPages}</span>
+                                            <button disabled={pdfPageNumber >= numPages} onClick={() => setPdfPageNumber(p => p + 1)} className="text-slate-800 disabled:opacity-30 p-2 hover:bg-slate-100 rounded"><ChevronRight /></button>
                                         </div>
                                     )}
+                                    <div className="mt-2 pt-2 border-t border-slate-200">
+                                        <a
+                                            href={viewingDoc.fileUrl}
+                                            download
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="w-full px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
+                                        >
+                                            <Download className="w-4 h-4" />
+                                            Download PDF
+                                        </a>
+                                    </div>
                                 </div>
                             ) : (
                                 <img
@@ -880,7 +920,7 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
                                 onClick={() => setViewPage(0)}
                                 className={`h-14 w-10 shrink-0 rounded border-2 overflow-hidden transition-all ${viewPage === 0 ? 'border-blue-500 opacity-100 scale-105' : 'border-transparent opacity-50'}`}
                             >
-                                {viewingDoc.fileUrl.endsWith('.pdf') ? (
+                                {viewingDoc.fileUrl.toLowerCase().includes('.pdf') || viewingDoc.fileUrl.includes('application/pdf') ? (
                                     <div className="w-full h-full bg-white flex items-center justify-center"><FileText className="w-4 h-4 text-slate-800" /></div>
                                 ) : (
                                     <img src={viewingDoc.fileUrl} className="w-full h-full object-cover" alt="Main" />
