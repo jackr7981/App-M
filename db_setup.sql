@@ -40,6 +40,10 @@ CREATE TABLE public.documents (
   expiry_date date,
   file_path text NOT NULL,
   page_paths text[],
+  is_encrypted boolean DEFAULT false NOT NULL,
+  encryption_version text,
+  document_hash text,
+  original_mime_type text,
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
