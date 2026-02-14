@@ -298,7 +298,7 @@ export const JobBoard: React.FC<JobBoardProps> = ({ userProfile, onNavigateToAge
               </div>
 
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm text-slate-600 mb-3">
-                <p className={expandedDescriptions.has(job.id) ? '' : 'line-clamp-3'}>
+                <p className={`whitespace-pre-wrap ${expandedDescriptions.has(job.id) ? '' : 'line-clamp-3'}`}>
                   {job.description}
                 </p>
                 {job.description && job.description.length > 150 && (

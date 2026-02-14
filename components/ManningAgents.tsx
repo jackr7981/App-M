@@ -14,6 +14,19 @@ export const ManningAgents: React.FC<ManningAgentsProps> = ({ userProfile }) => 
   const [selectedAgent, setSelectedAgent] = useState<ManningAgent | null>(null);
   const [showMap, setShowMap] = useState(false);
 
+  // Check for highlighted MLA from session storage (when navigating from JobBoard)
+  useEffect(() => {
+    const highlightMLA = sessionStorage.getItem('highlight_mla');
+    if (highlightMLA) {
+      const agent = APPROVED_AGENTS.find(a => a.licenseNumber === highlightMLA);
+      if (agent) {
+        setSelectedAgent(agent);
+        setSearchQuery(highlightMLA); // Also set search to help user see context
+      }
+      sessionStorage.removeItem('highlight_mla'); // Clear after use
+    }
+  }, []);
+
   // Reset map view when closing modal or switching agents
   useEffect(() => {
     if (selectedAgent) {

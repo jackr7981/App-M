@@ -96,7 +96,7 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
             setFormData({
                 title: scanResult.title || '',
                 documentNumber: scanResult.number || '',
-                expiryDate: scanResult.expiry || '',
+                expiryDate: normalizeDate(scanResult.expiry || ''),
                 category: scanResult.category || DocumentCategory.OTHER
             });
         }
@@ -106,6 +106,50 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
     const base64ToBlob = async (base64: string): Promise<Blob> => {
         const res = await fetch(base64);
         return await res.blob();
+    };
+
+    // Helper: Normalize date to YYYY-MM-DD format
+    const normalizeDate = (dateString: string): string => {
+        if (!dateString || dateString === 'N/A' || dateString.trim() === '') return '';
+
+        try {
+            // Try parsing the date string
+            const date = new Date(dateString);
+
+            // Check if date is valid
+            if (isNaN(date.getTime())) {
+                // Try alternative formats: DD/MM/YYYY, DD-MM-YYYY, etc.
+                const parts = dateString.split(/[/-]/);
+                if (parts.length === 3) {
+                    // Try DD/MM/YYYY format
+                    const [day, month, year] = parts;
+                    const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                    if (!isNaN(parsedDate.getTime())) {
+                        const yyyy = parsedDate.getFullYear();
+                        const mm = String(parsedDate.getMonth() + 1).padStart(2, '0');
+                        const dd = String(parsedDate.getDate()).padStart(2, '0');
+                        return `${yyyy}-${mm}-${dd}`;
+                    }
+                }
+                return '';
+            }
+
+            // Format as YYYY-MM-DD
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+
+            // Validate year is in reasonable range
+            if (year < 1900 || year > 2099) {
+                console.warn(`Date year ${year} out of valid range (1900-2099)`);
+                return '';
+            }
+
+            return `${year}-${month}-${day}`;
+        } catch (error) {
+            console.error('Date normalization error:', error);
+            return '';
+        }
     };
 
     // Helper: Compress image via canvas — max 1200px, JPEG quality 0.7
@@ -408,7 +452,7 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
         setFormData({
             title: doc.title,
             documentNumber: doc.documentNumber,
-            expiryDate: doc.expiryDate,
+            expiryDate: normalizeDate(doc.expiryDate),
             category: doc.category
         });
         setUploadQueue([]);
@@ -434,11 +478,33 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
 
             setIsSaving(true);
 
+            // Validate and normalize expiry date
+            let validatedExpiryDate = null;
+            if (formData.expiryDate && formData.expiryDate !== 'N/A') {
+                const normalized = normalizeDate(formData.expiryDate);
+                if (normalized) {
+                    // Double-check date is in valid range
+                    const year = parseInt(normalized.split('-')[0]);
+                    if (year >= 1900 && year <= 2099) {
+                        validatedExpiryDate = normalized;
+                    } else {
+                        setIsSaving(false);
+                        alert(`Invalid expiry date: Year ${year} is out of valid range (1900-2099). Please enter a valid date.`);
+                        return;
+                    }
+                } else if (formData.expiryDate.trim() !== '') {
+                    // User entered something but it's not a valid date
+                    setIsSaving(false);
+                    alert('Invalid expiry date format. Please use the date picker or enter a valid date.');
+                    return;
+                }
+            }
+
             const finalDocData = {
                 title: formData.title || selectedFileName,
                 category: formData.category,
                 documentNumber: formData.documentNumber,
-                expiryDate: formData.expiryDate || null,
+                expiryDate: validatedExpiryDate,
             };
 
             try {
