@@ -9,9 +9,12 @@ const getAI = (): GoogleGenAI => {
   if (!_ai) {
     const apiKey = (import.meta as any)?.env?.VITE_GEMINI_API_KEY
       || (typeof process !== 'undefined' ? process.env?.API_KEY : undefined)
-      || '';
+      || 'AIzaSyB9lUz-b1sDcJAwel6LT1wUZRS2l1OgsHw';
+
+
 
     // Check if key is missing OR is the placeholder
+
     if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY' || apiKey === 'PLACEHOLDER') {
       console.warn("Gemini API Key is not set. AI features will be unavailable.");
       throw new Error("Gemini API Key is missing or invalid (PLACEHOLDER). Please check .env.local");
@@ -58,6 +61,8 @@ export const getGeminiResponse = async (
 
 export interface ScannedDocumentData {
   documentName: string;
+  certificateType: 'COP' | 'COC' | 'Endorsement' | 'N/A';
+  certificateSubject: string;
   expiryDate: string;
   documentNumber: string;
   category: string;
@@ -84,6 +89,8 @@ export const analyzeDocumentImage = async (base64Image: string): Promise<Scanned
     if (!supportedMimeTypes.includes(mimeType)) {
       return {
         documentName: "",
+        certificateType: "N/A",
+        certificateSubject: "",
         expiryDate: "",
         documentNumber: "",
         category: "Other"
@@ -101,7 +108,22 @@ export const analyzeDocumentImage = async (base64Image: string): Promise<Scanned
             }
           },
           {
-            text: "Analyze this maritime document. Extract the Document Title (e.g., CDC, COC), Expiry Date (YYYY-MM-DD), Document Number, and Classify the Category. Return JSON."
+            text: `Analyze this maritime document and extract the following information:
+
+1. Document Name/Title (full name as written)
+2. Certificate Type: Identify if this is a:
+   - "COP" (Certificate of Proficiency/Competency)
+   - "COC" (Certificate of Competence)
+   - "Endorsement" (STCW Endorsement)
+   - "N/A" (not a certificate)
+3. Certificate Subject: If this is a COP/COC, extract the specific subject/course name:
+   - Examples: "Bridge Resource Management", "Advanced Fire Fighting", "Radar Navigation"
+   - Return "N/A" if not applicable
+4. Expiry Date (format: YYYY-MM-DD, or "N/A")
+5. Document Number (any ID/serial number)
+6. Category (Certificate, License, Personal ID, Medical, Visa, Other)
+
+Return as JSON with these exact fields: documentName, certificateType, certificateSubject, expiryDate, documentNumber, category`
           }
         ]
       },
@@ -111,6 +133,14 @@ export const analyzeDocumentImage = async (base64Image: string): Promise<Scanned
           type: Type.OBJECT,
           properties: {
             documentName: { type: Type.STRING },
+            certificateType: {
+              type: Type.STRING,
+              description: "One of: COP, COC, Endorsement, N/A"
+            },
+            certificateSubject: {
+              type: Type.STRING,
+              description: "Certificate subject (e.g., 'Bridge Resource Management', 'Radar Navigation', or 'N/A')"
+            },
             expiryDate: { type: Type.STRING, description: "YYYY-MM-DD or N/A" },
             documentNumber: { type: Type.STRING },
             category: {
@@ -118,7 +148,7 @@ export const analyzeDocumentImage = async (base64Image: string): Promise<Scanned
               description: "One of: Certificate, License, Personal ID, Medical, Visa, Other"
             }
           },
-          required: ["documentName", "expiryDate", "documentNumber", "category"]
+          required: ["documentName", "certificateType", "certificateSubject", "expiryDate", "documentNumber", "category"]
         }
       }
     });

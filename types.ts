@@ -138,6 +138,9 @@ export interface MarinerDocument {
   pages?: string[]; // Array of Base64 strings for multi-page documents
   uploadDate: number;
   category: DocumentCategory | string;
+  // Certificate metadata (auto-extracted by Gemini AI)
+  certificateType?: 'COP' | 'COC' | 'Endorsement' | 'N/A';
+  certificateSubject?: string; // e.g., "Bridge Resource Management", "Radar Navigation"
 }
 
 export interface ManningAgent {

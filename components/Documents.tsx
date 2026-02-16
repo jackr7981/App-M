@@ -415,9 +415,46 @@ export const Documents: React.FC<DocumentsProps> = ({ documents, onAddDocument, 
                 if (!formattedTitle || formattedTitle === 'Unknown Document' || formattedTitle === '') {
                     formattedTitle = fileName.split('.').slice(0, -1).join('.') || fileName;
                 }
-                // Replace long certificate names with abbreviations
-                formattedTitle = formattedTitle.replace(/Certificate of Proficiency/gi, 'COP');
-                formattedTitle = formattedTitle.replace(/Certificate of Competency/gi, 'COC');
+
+                // Document Renaming Logic - Auto-format based on AI-detected certificate type
+                const { certificateType, certificateSubject } = geminiData;
+
+                if (certificateType === 'COP' && certificateSubject && certificateSubject !== 'N/A') {
+                    // Format: "COP-Bridge Resource Management"
+                    formattedTitle = `COP-${certificateSubject}`;
+
+                } else if (certificateType === 'COC' && certificateSubject && certificateSubject !== 'N/A') {
+                    // Format: "COC-Master Mariner"
+                    formattedTitle = `COC-${certificateSubject}`;
+
+                } else if (certificateType === 'Endorsement' && certificateSubject && certificateSubject !== 'N/A') {
+                    // Format: "Endorsement-GMDSS"
+                    formattedTitle = `Endorsement-${certificateSubject}`;
+
+                } else {
+                    // Fallback: use document name with basic replacement
+                    formattedTitle = formattedTitle.replace(/Certificate of Proficiency/gi, 'COP');
+                    formattedTitle = formattedTitle.replace(/Certificate of Competency/gi, 'COC');
+                }
+
+                // Capitalize logic (Refined)
+                // Capitalize first letter of each word, but preserve acronyms
+                formattedTitle = formattedTitle
+                    .split(/(-|\s)/)
+                    .map((part) => {
+                        // Preserve hyphens and spaces
+                        if (part === '-' || part === ' ') return part;
+                        // Keep acronyms uppercase (COP, COC, etc.)
+                        if (/^(COP|COC|GMDSS|CDC|COE)$/i.test(part)) {
+                            return part.toUpperCase();
+                        }
+                        // Capitalize first letter of words
+                        return part.charAt(0).toUpperCase() + part.slice(1);
+                    })
+                    .join('');
+
+                // Final cleanup for acronyms at start
+                formattedTitle = formattedTitle.replace(/^Cop-/i, 'COP-').replace(/^Coc-/i, 'COC-').replace(/^Endorsement-/i, 'Endorsement-');
 
                 const finalExpiry = qrData?.expiry || (geminiData.expiryDate !== 'N/A' ? geminiData.expiryDate : '');
                 const finalNumber = qrData?.number || (geminiData.documentNumber !== 'N/A' ? geminiData.documentNumber : '');
