@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS public.vessel_tracking (
     sea_state TEXT,
 
     -- Metadata
-    data_source TEXT DEFAULT 'aishub',
+    data_source TEXT DEFAULT 'vesselfinder',
     last_updated TIMESTAMPTZ DEFAULT NOW(),
     created_at TIMESTAMPTZ DEFAULT NOW(),
 
@@ -109,7 +109,7 @@ CREATE TRIGGER update_vessel_tracking_timestamp_trigger
 CREATE OR REPLACE FUNCTION check_rate_limit(
   p_user_id UUID,
   p_endpoint TEXT,
-  p_max_requests INTEGER DEFAULT 10
+  p_max_requests INTEGER DEFAULT 20
 ) RETURNS BOOLEAN AS $$
 DECLARE
   current_count INTEGER;
@@ -203,15 +203,15 @@ GRANT ALL ON TABLE public.api_rate_limits TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION check_rate_limit(UUID, TEXT, INTEGER) TO service_role;
 
 -- 11. ADD COMMENTS FOR DOCUMENTATION
-COMMENT ON TABLE public.vessel_tracking IS 'Stores real-time vessel tracking data with 5-minute cache TTL';
+COMMENT ON TABLE public.vessel_tracking IS 'Stores real-time vessel tracking data with 5-minute cache TTL. Web scraped from VesselFinder.com';
 COMMENT ON COLUMN public.vessel_tracking.vessel_name IS 'Vessel name (uppercase) used as cache key';
 COMMENT ON COLUMN public.vessel_tracking.voyage_data IS 'JSONB field containing all voyage-related data for flexibility';
 COMMENT ON COLUMN public.vessel_tracking.last_updated IS 'Timestamp of last update; used for 5-minute cache validation';
 
 COMMENT ON TABLE public.favorite_vessels IS 'User-saved favorite vessels for quick access and future notifications';
 COMMENT ON TABLE public.vessel_search_history IS 'Search analytics; tracks all vessel searches for autocomplete and insights';
-COMMENT ON TABLE public.api_rate_limits IS 'Rate limiting: max 10 requests per hour per user per endpoint';
-COMMENT ON FUNCTION check_rate_limit(UUID, TEXT, INTEGER) IS 'Checks and updates user rate limit; returns TRUE if allowed, FALSE if exceeded';
+COMMENT ON TABLE public.api_rate_limits IS 'Rate limiting: max 20 requests per hour per user per endpoint (prevents IP bans from web scraping)';
+COMMENT ON FUNCTION check_rate_limit(UUID, TEXT, INTEGER) IS 'Checks and updates user rate limit; returns TRUE if allowed, FALSE if exceeded. Default: 20 requests/hour.';
 
 -- 12. MIGRATION COMPLETE
 -- Run this script in Supabase SQL Editor to deploy vessel tracker infrastructure

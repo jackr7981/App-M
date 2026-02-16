@@ -3,8 +3,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const VESSELFINDER_API_KEY = Deno.env.get("VESSELFINDER_API_KEY");
-const AISHUB_USERNAME = Deno.env.get("AISHUB_USERNAME");
 
 interface VesselTrackerRequest {
   vesselName: string;
@@ -12,21 +10,19 @@ interface VesselTrackerRequest {
 }
 
 interface VesselFinderResponse {
-  AIS?: {
-    MMSI: string;
-    SHIPNAME: string;
-    SOG: string;
-    COG: string;
-    HEADING: string;
-    LATITUDE: string;
-    LONGITUDE: string;
-    DESTINATION: string;
-    ETA: string;
-    IMO?: string;
-    CALLSIGN?: string;
-    SHIPTYPE?: string;
-  };
-  ERROR?: string;
+  shipName?: string;
+  imo?: string;
+  mmsi?: string;
+  callSign?: string;
+  shipType?: string;
+  latitude?: number;
+  longitude?: number;
+  speedOverGround?: number;
+  courseOverGround?: number;
+  heading?: number;
+  destination?: string;
+  eta?: string;
+  navStatus?: string;
 }
 
 interface WeatherData {
@@ -66,6 +62,13 @@ const AVERAGE_SPEEDS: Record<number, number> = {
   80: 12, // Other
 };
 
+// VesselFinder headers (mimic real browser)
+const VF_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+};
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -103,21 +106,21 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // 1. CHECK RATE LIMIT
+    // 1. CHECK RATE LIMIT (20 requests/hour to avoid IP bans)
     const { data: rateLimitResult, error: rateLimitError } = await supabase.rpc(
       "check_rate_limit",
       {
         p_user_id: userId,
         p_endpoint: "vessel-tracker",
-        p_max_requests: 10,
+        p_max_requests: 20,
       }
     );
 
     if (rateLimitError || !rateLimitResult) {
       return new Response(
         JSON.stringify({
-          error: "Rate limit exceeded: 10 requests per hour",
-          message: "Please try again later",
+          error: "Rate limit exceeded: 20 requests per hour",
+          message: "Please try again later to avoid IP bans",
         }),
         {
           status: 429,
@@ -146,6 +149,7 @@ serve(async (req) => {
             cachedVessel.vessel_type
           ),
           averageSpeed: calculateAverageSpeed(cachedVessel.vessel_type),
+          cached: true,
         }),
         {
           status: 200,
@@ -154,12 +158,12 @@ serve(async (req) => {
       );
     }
 
-    // 3. FETCH FROM AIS API
+    // 3. SCRAPE FROM VESSELFINDER.COM
     const vesselData = await searchVessel(vesselName);
 
     if (!vesselData) {
       return new Response(
-        JSON.stringify({ error: "Vessel not found in AIS databases" }),
+        JSON.stringify({ error: "Vessel not found in VesselFinder" }),
         {
           status: 404,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -169,44 +173,44 @@ serve(async (req) => {
 
     // 4. FETCH WEATHER DATA
     const weatherData = await getWeatherData(
-      parseFloat(vesselData.AIS!.LATITUDE),
-      parseFloat(vesselData.AIS!.LONGITUDE)
+      vesselData.latitude || 0,
+      vesselData.longitude || 0
     );
 
     // 5. PROCESS & CALCULATE
-    const shipTypeNum = vesselData.AIS!.SHIPTYPE
-      ? parseInt(vesselData.AIS!.SHIPTYPE)
-      : 80;
-    const sogValue = parseFloat(vesselData.AIS!.SOG || "0");
+    const shipTypeNum = 80; // Default to OTHER since we don't have numeric codes from scraping
+    const sogValue = vesselData.speedOverGround || 0;
     const averageSpeed = calculateAverageSpeed(shipTypeNum);
     const speedDifference = sogValue - averageSpeed;
 
     const vesselRecord = {
       user_id: userId,
-      vessel_name: vesselData.AIS!.SHIPNAME.toUpperCase(),
-      imo_number: vesselData.AIS!.IMO || null,
-      mmsi: vesselData.AIS!.MMSI || null,
-      call_sign: vesselData.AIS!.CALLSIGN || null,
-      vessel_type: getVesselTypeName(shipTypeNum),
-      latitude: parseFloat(vesselData.AIS!.LATITUDE) || null,
-      longitude: parseFloat(vesselData.AIS!.LONGITUDE) || null,
+      vessel_name: (vesselData.shipName || "UNKNOWN").toUpperCase(),
+      imo_number: vesselData.imo || null,
+      mmsi: vesselData.mmsi || null,
+      call_sign: vesselData.callSign || null,
+      vessel_type: vesselData.shipType || "UNKNOWN",
+      latitude: vesselData.latitude || null,
+      longitude: vesselData.longitude || null,
       speed_over_ground: sogValue || null,
-      course_over_ground: parseFloat(vesselData.AIS!.COG || "0") || null,
-      heading: parseFloat(vesselData.AIS!.HEADING || "0") || null,
-      status: getNAVStatus(0), // Default status
-      destination: vesselData.AIS!.DESTINATION || null,
-      next_port: vesselData.AIS!.DESTINATION || null,
-      eta: vesselData.AIS!.ETA ? parseETA(vesselData.AIS!.ETA) : null,
+      course_over_ground: vesselData.courseOverGround || null,
+      heading: vesselData.heading || null,
+      status: vesselData.navStatus || "UNKNOWN",
+      destination: vesselData.destination || null,
+      next_port: vesselData.destination || null,
+      eta: vesselData.eta ? new Date(vesselData.eta).toISOString() : null,
       wind_speed: weatherData.windSpeed,
       wind_direction: weatherData.windDirection,
       sea_state: weatherData.seaState,
       data_source: "vesselfinder",
       voyage_data: {
-        mmsi: vesselData.AIS!.MMSI,
-        shiptype: shipTypeNum,
-        imo: vesselData.AIS!.IMO,
-        destination: vesselData.AIS!.DESTINATION,
-        eta: vesselData.AIS!.ETA,
+        shipName: vesselData.shipName,
+        imo: vesselData.imo,
+        mmsi: vesselData.mmsi,
+        callSign: vesselData.callSign,
+        shipType: vesselData.shipType,
+        destination: vesselData.destination,
+        eta: vesselData.eta,
       },
     };
 
@@ -241,6 +245,7 @@ serve(async (req) => {
         ...savedVessel,
         speedDifference,
         averageSpeed,
+        cached: false,
       }),
       {
         status: 200,
@@ -263,41 +268,108 @@ serve(async (req) => {
 });
 
 /**
- * Search for vessel in AIS databases
- * Primary: VesselFinder API (name search)
- * Fallback: AISHub (requires MMSI)
+ * Search for vessel on VesselFinder.com
+ * Uses web scraping (same pattern as CDC verification)
  */
 async function searchVessel(vesselName: string): Promise<VesselFinderResponse | null> {
   try {
-    // Try VesselFinder API first
-    if (VESSELFINDER_API_KEY) {
-      const url = `https://api.vesselfinder.com/vesselfinder?userkey=${VESSELFINDER_API_KEY}&name=${encodeURIComponent(
-        vesselName
-      )}`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000); // 8 second timeout
 
-      const response = await fetch(url);
+    // Step 1: Search for vessel by name
+    const searchUrl = `https://www.vesselfinder.com/vessels?name=${encodeURIComponent(
+      vesselName
+    )}`;
 
-      if (response.ok) {
-        const data = (await response.json()) as VesselFinderResponse;
-        if (!data.ERROR && data.AIS) {
-          console.log("Found vessel via VesselFinder:", vesselName);
-          return data;
-        }
-      }
+    console.log("Searching for vessel:", vesselName);
+
+    const searchRes = await fetch(searchUrl, {
+      headers: VF_HEADERS,
+      signal: controller.signal,
+    });
+
+    if (!searchRes.ok) {
+      clearTimeout(timeout);
+      console.log("Search returned status:", searchRes.status);
+      return null;
     }
 
-    // Fallback: Return null if not found
-    console.log("Vessel not found in AIS databases:", vesselName);
-    return null;
+    const searchHtml = await searchRes.text();
+
+    // Step 2: Extract first result's details link
+    const detailsLinkMatch = searchHtml.match(
+      /href="(\/vessels\/details\/[^"]+)"/
+    );
+    if (!detailsLinkMatch) {
+      clearTimeout(timeout);
+      console.log("No vessel found in search results");
+      return null;
+    }
+
+    const detailsUrl = `https://www.vesselfinder.com${detailsLinkMatch[1]}`;
+    console.log("Found vessel details URL:", detailsUrl);
+
+    // Step 3: Fetch vessel details page
+    const detailsRes = await fetch(detailsUrl, {
+      headers: VF_HEADERS,
+      signal: controller.signal,
+    });
+
+    if (!detailsRes.ok) {
+      clearTimeout(timeout);
+      return null;
+    }
+
+    const detailsHtml = await detailsRes.text();
+    clearTimeout(timeout);
+
+    // Step 4: Parse vessel data from HTML
+    const vesselData = parseVesselHtml(detailsHtml);
+    return vesselData;
   } catch (error) {
-    console.error("Error fetching AIS data:", error);
+    console.error("Vessel search error:", error);
     return null;
   }
 }
 
 /**
- * Fetch weather data from Open-Meteo API
- * Free, no authentication required
+ * Parse vessel data from VesselFinder HTML
+ */
+function parseVesselHtml(html: string): VesselFinderResponse {
+  return {
+    // Vessel identification
+    shipName: extractField(html, /(?:<h1[^>]*>|Ship Name[^>]*>)([^<]+)</i),
+    imo: extractField(html, /IMO[^>]*>([0-9]+)</i),
+    mmsi: extractField(html, /MMSI[^>]*>([0-9]+)</i),
+    callSign: extractField(html, /Call Sign[^>]*>([^<]+)</i),
+    shipType: extractField(html, /Ship Type[^>]*>([^<]+)</i),
+
+    // Position data
+    latitude: parseFloat(extractField(html, /Latitude[^>]*>([-0-9.]+)°?/i) || "0") || undefined,
+    longitude: parseFloat(extractField(html, /Longitude[^>]*>([-0-9.]+)°?/i) || "0") || undefined,
+
+    // Speed and course
+    speedOverGround: parseFloat(extractField(html, /Speed[^>]*>([0-9.]+)\s*(?:kn|knots)/i) || "0") || undefined,
+    courseOverGround: parseFloat(extractField(html, /Course[^>]*>([0-9.]+)°/i) || "0") || undefined,
+    heading: parseFloat(extractField(html, /Heading[^>]*>([0-9.]+)°/i) || "0") || undefined,
+
+    // Voyage data
+    destination: extractField(html, /Destination[^>]*>([^<]+)</i) || undefined,
+    eta: extractField(html, /ETA[^>]*>([^<]+)</i) || undefined,
+    navStatus: extractField(html, /Status[^>]*>([^<]+)</i) || undefined,
+  };
+}
+
+/**
+ * Extract field from HTML using regex
+ */
+function extractField(html: string, regex: RegExp): string | null {
+  const match = html.match(regex);
+  return match ? match[1].trim() : null;
+}
+
+/**
+ * Fetch weather data from Open-Meteo API (free, no auth required)
  */
 async function getWeatherData(
   lat: number,
@@ -371,25 +443,4 @@ function getSeaState(waveHeight: number): string {
   if (waveHeight < 2.5) return "Moderate";
   if (waveHeight < 4) return "Rough";
   return "Very Rough";
-}
-
-/**
- * Parse ETA from AIS format (MMDDHHMM)
- */
-function parseETA(etaString: string): string | null {
-  try {
-    if (!etaString || etaString.length < 8) return null;
-
-    const month = etaString.substring(0, 2);
-    const day = etaString.substring(2, 4);
-    const hour = etaString.substring(4, 6);
-    const minute = etaString.substring(6, 8);
-
-    const currentYear = new Date().getFullYear();
-    const eta = new Date(`${currentYear}-${month}-${day}T${hour}:${minute}:00Z`);
-
-    return eta.toISOString();
-  } catch {
-    return null;
-  }
 }
