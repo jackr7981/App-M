@@ -244,3 +244,24 @@ export interface MoodEntry {
   timestamp: number;
   mood: MoodType;
 }
+
+// Vessel Tracking Types
+export interface VesselData {
+  id: string;
+  vessel_name: string;
+  status: string;
+  latitude: number;
+  longitude: number;
+  speed_over_ground: number;
+  heading: number;
+  destination: string;
+  wind_speed?: number;
+  sea_state?: string;
+  last_updated: string;
+  speedDifference?: number;
+  averageSpeed?: number;
+  imo_number?: string;
+  mmsi?: string;
+  call_sign?: string;
+  vessel_type?: string;
+}

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { User, ChatMessage, MarinerDocument, DocumentCategory, SeaServiceRecord } from '../types';
-import { User as UserIcon, LogOut, Send, Bot, Ship, FileText, Anchor, Edit, Building2, Briefcase, Stethoscope, Palmtree, Users, HeartHandshake, Home, Grid, ChevronRight, X, Settings, LogOut as LogOutIcon, School } from 'lucide-react';
+import { User as UserIcon, LogOut, Send, Bot, Ship, FileText, Anchor, Edit, Building2, Briefcase, Stethoscope, Palmtree, Users, HeartHandshake, Home, Grid, ChevronRight, X, Settings, LogOut as LogOutIcon, School, Target } from 'lucide-react';
 import { getGeminiResponse } from '../services/geminiService';
 import { Documents } from './Documents';
 import { SeaService } from './SeaService';
@@ -10,6 +10,7 @@ import { AlumniAssociation } from './AlumniAssociation';
 import { MedicalCenters } from './MedicalCenters';
 import { Community } from './Community';
 import { Wellbeing } from './Wellbeing';
+import { VesselTracker } from './VesselTracker';
 import { supabase, getStorageUrl, isMockMode } from '../services/supabase';
 
 interface DashboardProps {
@@ -22,7 +23,7 @@ interface DashboardProps {
 }
 
 // Grouping Navigation Items
-type TabId = 'home' | 'jobs' | 'chat' | 'documents' | 'menu' | 'seaservice' | 'agents' | 'medical' | 'community' | 'wellbeing' | 'alumni';
+type TabId = 'home' | 'jobs' | 'chat' | 'documents' | 'menu' | 'seaservice' | 'agents' | 'medical' | 'community' | 'wellbeing' | 'alumni' | 'vessel';
 
 export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onEditProfile, onUpdateSeaService, onToggleJobStatus, onToggleOnboardStatus }) => {
     const [activeTab, setActiveTab] = useState<TabId>('home');
@@ -127,7 +128,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onEditProf
     const handleDeleteDocument = (id: string) => setDocuments(prev => prev.filter(d => d.id !== id));
 
     // Determine if we are on a secondary tab
-    const isSecondaryTab = ['seaservice', 'agents', 'medical', 'community', 'wellbeing'].includes(activeTab);
+    const isSecondaryTab = ['seaservice', 'agents', 'medical', 'community', 'wellbeing', 'vessel'].includes(activeTab);
 
     // App Grid Items
     const menuItems = [
@@ -137,6 +138,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onEditProf
         { id: 'community', label: 'Forum', icon: Users, color: 'bg-purple-100 text-purple-600' },
         { id: 'wellbeing', label: 'Wellbeing', icon: HeartHandshake, color: 'bg-emerald-100 text-emerald-600' },
         { id: 'alumni', label: 'Alumni', icon: School, color: 'bg-amber-100 text-amber-600' },
+        { id: 'vessel', label: 'Vessel Tracker', icon: Target, color: 'bg-cyan-100 text-cyan-600' },
     ];
 
     return (
@@ -249,6 +251,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onEditProf
                             </button>
                         </div>
 
+                        {/* Vessel Tracker Quick Access */}
+                        <div onClick={() => setActiveTab('vessel')} className="bg-gradient-to-r from-cyan-600 to-blue-600 rounded-2xl p-4 shadow-md text-white active:scale-[0.99] transition-transform cursor-pointer overflow-hidden relative">
+                            <Anchor className="absolute right-0 top-0 opacity-10 translate-x-1/4 -translate-y-1/4 w-24 h-24" />
+                            <div className="flex justify-between items-center relative z-10">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                                        <Target className="w-5 h-5 text-white" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-sm">Vessel Tracker</h3>
+                                        <p className="text-[10px] text-blue-100">Live AIS Tracking Worldwide</p>
+                                    </div>
+                                </div>
+                                <ChevronRight className="w-5 h-5 text-white/50" />
+                            </div>
+                        </div>
+
                         {/* Community Teaser */}
                         <div onClick={() => setActiveTab('community')} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 active:scale-[0.99] transition-transform cursor-pointer">
                             <div className="flex justify-between items-center mb-2">
@@ -333,6 +352,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onEditProf
                 {activeTab === 'community' && <Community user={user} />}
                 {activeTab === 'wellbeing' && <Wellbeing />}
                 {activeTab === 'alumni' && <AlumniAssociation />}
+                {activeTab === 'vessel' && <VesselTracker />}
 
                 {/* CHAT VIEW */}
                 {activeTab === 'chat' && (
